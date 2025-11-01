@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>AR 二项分布 (LiDAR + 滾動條)</title>
+  <title>AR 二项分布 (实时拖动 + LiDAR)</title>
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
   <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar-nft.js"></script>
   <script src="https://cdn.jsdelivr.net/gh/AR-js-org/aframe-arkit@master/dist/aframe-arkit.min.js"></script>
@@ -13,7 +13,6 @@
     .info { position: absolute; top: 15px; left: 15px; right: 15px; color: #fff; background: rgba(0,0,0,0.7); padding: 12px; border-radius: 12px; font-size: 15px; text-align: center; z-index: 100; }
     .control { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.85); padding: 16px; border-radius: 18px; color: white; width: 90%; max-width: 360px; z-index: 100; box-shadow: 0 6px 16px rgba(0,0,0,0.3); }
     
-    /* 滾動條樣式 */
     .slider-container { margin: 12px 0; text-align: center; }
     .slider-label { display: block; margin-bottom: 6px; font-weight: bold; font-size: 15px; }
     .slider-value { display: inline-block; width: 50px; font-weight: bold; color: #4a90e2; }
@@ -23,7 +22,6 @@
     input[type="range"]::-webkit-slider-thumb {
       -webkit-appearance: none; width: 24px; height: 24px; border-radius: 50%; background: #007aff; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.3);
     }
-    button { margin-top: 12px; padding: 12px 24px; background: #007aff; color: white; border: none; border-radius: 12px; font-size: 16px; font-weight: bold; width: 100%; }
     
     .lidar-status { position: absolute; top: 80px; left: 50%; transform: translateX(-50%); background: #34c759; color: white; padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: bold; z-index: 100; display: none; }
   </style>
@@ -33,7 +31,7 @@
 <div class="info" id="info">LiDAR 启动中…</div>
 <div class="lidar-status" id="lidarStatus">LiDAR 已激活</div>
 
-<!-- 滾動條控制面板 -->
+<!-- 滾動條控制面板（实时更新） -->
 <div class="control">
   <div class="slider-container">
     <span class="slider-label">n (試驗次數): <span class="slider-value" id="nValue">10</span></span>
@@ -43,7 +41,6 @@
     <span class="slider-label">p (成功機率): <span class="slider-value" id="pValue">0.50</span></span>
     <input type="range" min="0" max="100" value="50" step="1" id="pSlider">
   </div>
-  <button onclick="updateChart()">立即更新圖表</button>
 </div>
 
 <a-scene
@@ -73,15 +70,24 @@
   const nValue = document.getElementById('nValue');
   const pValue = document.getElementById('pValue');
 
-  // ========== 滾動條即時更新顯示 ==========
+  // ========== 实时更新函数 ==========
+  function updateChart() {
+    drawChart(currentN, currentP);
+    infoEl.innerHTML = `实时更新！<br>n=${currentN}, p=${currentP.toFixed(2)}`;
+  }
+
+  // ========== n 滾動條：拖动时实时更新 ==========
   nSlider.addEventListener('input', () => {
     currentN = parseInt(nSlider.value);
     nValue.textContent = currentN;
+    updateChart(); // 实时刷新
   });
 
+  // ========== p 滾動條：拖动时实时更新 ==========
   pSlider.addEventListener('input', () => {
     currentP = pSlider.value / 100;
     pValue.textContent = currentP.toFixed(2);
+    updateChart(); // 实时刷新
   });
 
   // ========== LiDAR 檢測 ==========
@@ -167,18 +173,12 @@
     }
   });
 
-  // ========== 更新函數 ==========
-  function updateChart() {
-    drawChart(currentN, currentP);
-    infoEl.innerHTML = `更新成功！<br>n=${currentN}, p=${currentP.toFixed(2)}`;
-  }
-
   // ========== 初始化 ==========
   window.onload = () => {
     checkLiDAR();
     setTimeout(() => {
       drawChart(currentN, currentP);
-      infoEl.innerHTML = '模型已載入！<br>拖動滾動條調整參數';
+      infoEl.innerHTML = '实时 AR 已就绪！<br>拖动滾動條看變化';
     }, 2000);
   };
 
