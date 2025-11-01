@@ -3,156 +3,50 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AR 二项分布可视化</title>
-
-  <!-- A-Frame -->
+  <title>AR 二项分布测试</title>
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-  <!-- AR.js (NFT / location-based) -->
-  <script src="https://cdn.jsdelivr.net/npm/ar.js@3.4.5/aframe/build/aframe-ar-nft.js"></script>
-  
+  <!-- 修复：使用有效 CDN -->
+  <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar-nft.js"></script>
   <style>
-    body { margin:0; overflow:hidden; }
-    .info {
-      position: absolute; top: 10px; left: 10px; color: #fff;
-      background: rgba(0,0,0,0.5); padding: 8px; border-radius: 4px;
-      font-family: sans-serif; font-size: 14px;
-    }
+    body { margin: 0; overflow: hidden; }
+    .info { position: absolute; top: 10px; left: 10px; color: #fff; background: rgba(0,0,0,0.6); padding: 8px; border-radius: 4px; font-size: 14px; z-index: 100; }
   </style>
 </head>
 <body>
 
-<div class="info">请允许相机权限，模型会出现在你前方约 2 米处</div>
+<div class="info">正在加载 AR…（若黑屏请刷新）</div>
 
 <a-scene
   embedded
   vr-mode-ui="enabled: false"
   renderer="logarithmicDepthBuffer: true"
-  arjs="sourceType: webcam; detectionMode: mono_and_matrix; matrixCodeType: 3x3; trackingMethod: best; debugUIEnabled: false;"
-  gps-projected-camera
+  arjs="sourceType: webcam; debugUIEnabled: true;"
+  gps-projected-camera="gpsMinDistance: 0; simulateLatitude: 22.3193; simulateLongitude: 114.1694;"
 >
-
-  <!-- 模型容器 -->
-  <a-entity id="modelGroup" gps-projected-position="distance:2; latitudeOffset:0; longitudeOffset:0"></a-entity>
-
-  <!-- 相机 -->
+  <a-entity id="modelGroup" gps-projected-position="distance:1"></a-entity>
   <a-camera gps-projected-camera rotation-reader></a-camera>
-
 </a-scene>
 
 <script>
-  // ---------- 1. 二项分布计算 ----------
-  function C(n, k) {
-    if (k < 0 || k > n) return 0;
-    let res = 1;
-    for (let i = 1; i <= k; ++i) res = res * (n - i + 1) / i;
-    return res;
-  }
-
-  function binomialData(n, p) {
-    const data = [];
-    for (let k = 0; k <= n; ++k) {
-      const pk = C(n, k) * Math.pow(p, k) * Math.pow(1 - p, n - k);
-      data.push({k, pk});
-    }
-    return data;
-  }
-
-  // ---------- 2. 参数 ----------
-  const n = 10, p = 0.5;
-  const data = binomialData(n, p);
-
-  const BAR_WIDTH = 0.12;      // 柱体宽
-  const BAR_DEPTH = 0.12;      // 柱体深
-  const SPACING   = 0.18;      // 柱体间距
-  const SCALE_Y   = 8;         // 概率放大倍数（让最高柱约 2 米高）
-
-  // ---------- 3. 创建 3D 柱体 ----------
   const scene = document.querySelector('#modelGroup');
 
-  data.forEach(d => {
-    const height = d.pk * SCALE_Y;
-    const xPos   = (d.k - n/2) * SPACING;
+  // 测试：红球 + 文字
+  const ball = document.createElement('a-sphere');
+  ball.setAttribute('radius', '0.3');
+  ball.setAttribute('color', 'red');
+  ball.setAttribute('position', '0 0.5 -1');
+  scene.appendChild(ball);
 
-    // 柱体
-    const bar = document.createElement('a-box');
-    bar.setAttribute('width', BAR_WIDTH);
-    bar.setAttribute('depth', BAR_DEPTH);
-    bar.setAttribute('height', height);
-    bar.setAttribute('position', `${xPos} ${height/2} 0`);
-    bar.setAttribute('color', '#1565c0');
-    bar.setAttribute('shadow', 'receive: true; cast: true');
-    bar.setAttribute('class', 'clickable');
-    bar.setAttribute('data-k', d.k);
-    bar.setAttribute('data-pk', d.pk.toFixed(4));
-    scene.appendChild(bar);
+  const text = document.createElement('a-text');
+  text.setAttribute('value', 'AR 成功！');
+  text.setAttribute('color', 'white');
+  text.setAttribute('position', '0 1 -1');
+  text.setAttribute('rotation', '-90 0 0');
+  text.setAttribute('scale', '1.5 1.5 1.5');
+  scene.appendChild(text);
 
-    // X 轴标签（文字）
-    const label = document.createElement('a-text');
-    label.setAttribute('value', `${d.k}`);
-    label.setAttribute('align', 'center');
-    label.setAttribute('color', '#fff');
-    label.setAttribute('position', `${xPos} -0.08 0`);
-    label.setAttribute('rotation', '-90 0 0');
-    label.setAttribute('scale', '0.4 0.4 0.4');
-    scene.appendChild(label);
-  });
-
-  // ---------- 4. 地面（参考网格） ----------
-  const ground = document.createElement('a-plane');
-  ground.setAttribute('width', (n+1)*SPACING);
-  ground.setAttribute('depth', 2);
-  ground.setAttribute('position', `0 -0.01 0`);
-  ground.setAttribute('rotation', '-90 0 0');
-  ground.setAttribute('color', '#444');
-  ground.setAttribute('opacity', '0.6');
-  ground.setAttribute('shadow', 'receive: true');
-  scene.appendChild(ground);
-
-  // ---------- 5. 灯光 ----------
-  const ambient = document.createElement('a-light');
-  ambient.setAttribute('type', 'ambient');
-  ambient.setAttribute('color', '#bbb');
-  scene.appendChild(ambient);
-
-  const directional = document.createElement('a-light');
-  directional.setAttribute('type', 'directional');
-  directional.setAttribute('position', '2 4 2');
-  directional.setAttribute('intensity', '0.9');
-  scene.appendChild(directional);
-
-  // ---------- 6. 点击交互 ----------
-  document.querySelectorAll('.clickable').forEach(el => {
-    el.addEventListener('click', function () {
-      const k  = this.getAttribute('data-k');
-      const pk = this.getAttribute('data-pk');
-      alert(`k = ${k}\nP(k) = ${pk}`);
-    });
-  });
-
-  // ---------- 7. 提示用户 ----------
-  AFRAME.registerComponent('gps-projected-position', {
-    schema: { distance: {type: 'number', default: 2},
-              latitudeOffset: {type: 'number', default: 0},
-              longitudeOffset: {type: 'number', default: 0} },
-    init: function () {
-      const el = this.el;
-      const data = this.data;
-      // 当 GPS 位置可用时自动投影
-      el.sceneEl.addEventListener('gps-camera-update-position', e => {
-        const pos = e.detail.position;
-        const projected = new AFRAME.THREE.Vector3();
-        // 使用 AR.js 提供的投影函数
-        if (window.ARjs && window.ARjs.Utils) {
-          const lat = pos.latitude + data.latitudeOffset;
-          const lon = pos.longitude + data.longitudeOffset;
-          const projectedPos = window.ARjs.Utils.convertGeoCoordsToMeters(lat, lon, pos.latitude, pos.longitude);
-          projected.set(projectedPos.x, 0, -projectedPos.y);
-          el.object3D.position.copy(projected);
-        }
-      });
-    }
-  });
-
+  // 成功后可恢复你的二项分布代码
 </script>
+
 </body>
 </html>
