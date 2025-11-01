@@ -3,18 +3,25 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AR 二项分布测试</title>
+  <title>AR 二项分布 n=10, p=0.5</title>
+
+  <!-- A-Frame -->
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-  <!-- 修复：使用有效 CDN -->
+  <!-- 修复：使用有效的 AR.js CDN -->
   <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar-nft.js"></script>
+
   <style>
     body { margin: 0; overflow: hidden; }
-    .info { position: absolute; top: 10px; left: 10px; color: #fff; background: rgba(0,0,0,0.6); padding: 8px; border-radius: 4px; font-size: 14px; z-index: 100; }
+    .info {
+      position: absolute; top: 10px; left: 10px; color: #fff;
+      background: rgba(0,0,0,0.7); padding: 8px 12px; border-radius: 6px;
+      font-family: sans-serif; font-size: 14px; z-index: 100;
+    }
   </style>
 </head>
 <body>
 
-<div class="info">正在加载 AR…（若黑屏请刷新）</div>
+<div class="info">AR 加载中… 模型在前方 1 米处</div>
 
 <a-scene
   embedded
@@ -23,29 +30,108 @@
   arjs="sourceType: webcam; debugUIEnabled: true;"
   gps-projected-camera="gpsMinDistance: 0; simulateLatitude: 22.3193; simulateLongitude: 114.1694;"
 >
+  <!-- 模型放在前方 1 米 -->
   <a-entity id="modelGroup" gps-projected-position="distance:1"></a-entity>
   <a-camera gps-projected-camera rotation-reader></a-camera>
 </a-scene>
 
 <script>
+  // ========== 1. 二项分布计算 ==========
+  function C(n, k) {
+    if (k < 0 || k > n) return 0;
+    let res = 1;
+    for (let i = 1; i <= k; ++i) {
+      res = res * (n - i + 1) / i;
+    }
+    return res;
+  }
+
+  function binomialData(n, p) {
+    const data = [];
+    for (let k = 0; k <= n; ++k) {
+      const pk = C(n, k) * Math.pow(p, k) * Math.pow(1 - p, n - k);
+      data.push({ k, pk });
+    }
+    return data;
+  }
+
+  // ========== 2. 参数设置 ==========
+  const n = 10, p = 0.5;
+  const data = binomialData(n, p);
+
+  const BAR_WIDTH = 0.12;
+  const BAR_DEPTH = 0.12;
+  const SPACING   = 0.18;     // 柱子间距
+  const SCALE_Y   = 8;        // 高度放大（最高 ~0.25 → 2米）
+
+  // ========== 3. 创建柱状图 ==========
   const scene = document.querySelector('#modelGroup');
 
-  // 测试：红球 + 文字
-  const ball = document.createElement('a-sphere');
-  ball.setAttribute('radius', '0.3');
-  ball.setAttribute('color', 'red');
-  ball.setAttribute('position', '0 0.5 -1');
-  scene.appendChild(ball);
+  data.forEach(d => {
+    const height = d.pk * SCALE_Y;
+    const xPos   = (d.k - n/2) * SPACING;
 
-  const text = document.createElement('a-text');
-  text.setAttribute('value', 'AR 成功！');
-  text.setAttribute('color', 'white');
-  text.setAttribute('position', '0 1 -1');
-  text.setAttribute('rotation', '-90 0 0');
-  text.setAttribute('scale', '1.5 1.5 1.5');
-  scene.appendChild(text);
+    // 柱体
+    const bar = document.createElement('a-box');
+    bar.setAttribute('width', BAR_WIDTH);
+    bar.setAttribute('depth', BAR_DEPTH);
+    bar.setAttribute('height', height);
+    bar.setAttribute('position', `${xPos} ${height/2} 0`);
+    bar.setAttribute('color', '#1565c0');
+    bar.setAttribute('shadow', 'cast: true; receive: true');
+    bar.setAttribute('class', 'clickable');
+    bar.setAttribute('data-k', d.k);
+    bar.setAttribute('data-pk', d.pk.toFixed(4));
+    scene.appendChild(bar);
 
-  // 成功后可恢复你的二项分布代码
+    // X 轴标签
+    const label = document.createElement('a-text');
+    label.setAttribute('value', d.k.toString());
+    label.setAttribute('align', 'center');
+    label.setAttribute('color', '#ffffff');
+    label.setAttribute('position', `${xPos} -0.05 0`);
+    label.setAttribute('rotation', '-90 0 0');
+    label.setAttribute('scale', '0.5 0.5 0.5');
+    scene.appendChild(label);
+  });
+
+  // ========== 4. 地面参考 ==========
+  const ground = document.createElement('a-plane');
+  ground.setAttribute('width', (n + 2) * SPACING);
+  ground.setAttribute('depth', 1.5);
+  ground.setAttribute('position', '0 -0.01 0');
+  ground.setAttribute('rotation', '-90 0 0');
+  ground.setAttribute('color', '#2c3e50');
+  ground.setAttribute('opacity', '0.7');
+  ground.setAttribute('shadow', 'receive: true');
+  scene.appendChild(ground);
+
+  // ========== 5. 灯光 ==========
+  const ambient = document.createElement('a-light');
+  ambient.setAttribute('type', 'ambient');
+  ambient.setAttribute('color', '#bbbbbb');
+  scene.appendChild(ambient);
+
+  const directional = document.createElement('a-light');
+  directional.setAttribute('type', 'directional');
+  directional.setAttribute('position', '3 5 2');
+  directional.setAttribute('intensity', '0.8');
+  scene.appendChild(directional);
+
+  // ========== 6. 点击交互 ==========
+  document.querySelectorAll('.clickable').forEach(el => {
+    el.addEventListener('click', function () {
+      const k = this.getAttribute('data-k');
+      const pk = this.getAttribute('data-pk');
+      alert(`二项分布 B(${n}, ${p})\nP(X = ${k}) = ${pk}`);
+    });
+  });
+
+  // ========== 7. 加载完成提示 ==========
+  setTimeout(() => {
+    document.querySelector('.info').innerHTML = 'AR 已就绪！<br>共 11 根柱体，点击查看概率';
+  }, 2000);
+
 </script>
 
 </body>
