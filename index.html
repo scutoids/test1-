@@ -2,96 +2,149 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>AR 二項式分布 3D 模型</title>
-  <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/ar.js@3.4.0/aframe/build/aframe-ar.min.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>AR 二項式分布（iPhone 專用）</title>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.157.0/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.157.0/examples/js/exporters/USDZExporter.js"></script>
   <style>
-    body { margin: 0; overflow: hidden; }
-    #controls {
-      position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
-      background: rgba(0,0,0,0.8); color: #fff; padding: 16px; border-radius: 16px;
-      text-align: center; width: 90%; max-width: 420px; z-index: 100; backdrop-filter: blur(10px);
+    body { margin: 0; padding: 20px; font-family: -apple-system; background: #f0f0f0; text-align: center; }
+    #controls { background: white; padding: 20px; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); max-width: 400px; margin: 20px auto; }
+    h2 { color: #1a1a1a; margin-bottom: 20px; }
+    label { display: block; margin: 15px 0 8px; font-weight: 600; }
+    input[type="range"] { width: 100%; height: 8px; border-radius: 4px; background: #ddd; }
+    input[type="range"]::-webkit-slider-thumb { background: #007AFF; width: 20px; height: 20px; border-radius: 50%; }
+    #values { font-size: 18px; font-weight: bold; color: #007AFF; margin: 10px 0; }
+    #arButton {
+      margin-top: 25px; padding: 14px 30px; font-size: 18px; font-weight: bold;
+      background: #007AFF; color: white; border: none; border-radius: 12px;
+      cursor: pointer; box-shadow: 0 4px 12px rgba(0,122,255,0.3);
     }
-    .slider { width: 100%; height: 8px; border-radius: 4px; background: #444; }
-    .slider::-webkit-slider-thumb { width: 20px; height: 20px; border-radius: 50%; background: #4A9EFF; }
+    #arButton:active { transform: scale(0.98); }
+    #formula { margin-top: 15px; font-family: monospace; color: #555; }
+    .info { font-size: 14px; color: #666; margin-top: 30px; }
   </style>
 </head>
 <body>
 
-  <a-scene
-    embedded
-    arjs="sourceType: webcam; trackingMethod: best; debugUIEnabled: false;"
-    renderer="logarithmicDepthBuffer: true; physicallyCorrectLights: true;"
-    vr-mode-ui="enabled: false"
-    device-orientation-permission-ui="enabled: false">
-
-    <a-marker preset="hiro">
-      <a-entity id="chart" position="0 0.1 0" scale="0.5 0.5 0.5"></a-entity>
-    </a-marker>
-
-    <a-entity light="type: ambient; intensity: 0.6"></a-entity>
-    <a-entity light="type: directional; intensity: 0.8" position="2 3 1"></a-entity>
-
-    <a-entity camera></a-entity>
-  </a-scene>
-
   <div id="controls">
-    <h3>二項式分布 B(n, p)</h3>
-    <label for="n">n: <span id="nValue">10</span></label>
-    <input type="range" id="n" class="slider" min="1" max="50" value="10">
-    <label for="p">p: <span id="pValue">0.50</span></label>
-    <input type="range" id="p" class="slider" min="1" max="99" value="50" step="1">
+    <h2>二項式分布 AR 模型</h2>
+    
+    <label for="n">試驗次數 n: <span id="nValue">10</span></label>
+    <input type="range" id="n" min="1" max="30" value="10">
+
+    <label for="p">成功概率 p: <span id="pValue">0.50</span></label>
+    <input type="range" id="p" min="1" max="99" value="50" step="1">
+
+    <div id="values">n = 10, p = 0.50</div>
     <div id="formula"></div>
+
+    <button id="arButton">查看 AR 3D 模型</button>
+  </div>
+
+  <div class="info">
+    <p>iPhone / iPad 專用 • 點擊按鈕後將開啟真實 AR</p>
   </div>
 
   <script>
+    // 二項式計算
     function binomialCoeff(n, k) {
       if (k < 0 || k > n) return 0;
       let res = 1;
       for (let i = 1; i <= k; i++) res = res * (n - i + 1) / i;
-      return res;
+      return Math.round(res * 1000) / 1000;
     }
 
     function binomialPMF(n, p, k) {
       return binomialCoeff(n, k) * Math.pow(p, k) * Math.pow(1 - p, n - k);
     }
 
-    function updateChart(n, p) {
-      const chart = document.getElementById('chart');
-      chart.innerHTML = '';
-      const maxProb = Math.max(...Array.from({length: n+1}, (_, k) => binomialPMF(n, p, k)));
-      const scaleY = 1.0 / (maxProb || 1);
+    // 生成 USDZ 模型
+    async function generateUSDZ(n, p) {
+      const scene = new THREE.Scene();
+      const probs = Array.from({length: n+1}, (_, k) => binomialPMF(n, p, k));
+      const maxProb = Math.max(...probs, 0.1);
+      const scaleY = 1.5 / maxProb;
 
-      for (let k = 0; k <= n; k++) {
-        const prob = binomialPMF(n, p, k);
+      probs.forEach((prob, k) => {
+        if (prob < 0.01) return;
         const height = prob * scaleY;
-        if (height < 0.02) continue;
-        const x = (k - n/2) * 0.1;
+        const geometry = new THREE.BoxGeometry(0.15, height, 0.15);
+        const material = new THREE.MeshStandardMaterial({
+          color: new THREE.Color().setHSL(0.6 * (1 - prob/maxProb), 1, 0.5),
+          metalness: 0.3,
+          roughness: 0.4
+        });
+        const mesh = new THREE.Mesh(geometry, material);
+        mesh.position.set((k - n/2) * 0.18, height/2, 0);
+        scene.add(mesh);
 
-        const bar = document.createElement('a-box');
-        bar.setAttribute('position', `${x} ${height/2} 0`);
-        bar.setAttribute('width', '0.08'); bar.setAttribute('height', height);
-        bar.setAttribute('depth', '0.08'); bar.setAttribute('color', `hsl(${240*(1-prob/maxProb)},100%,55%)`);
-        chart.appendChild(bar);
+        // 標籤
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = 64; canvas.height = 64;
+        ctx.fillStyle = 'white';
+        ctx.font = 'bold 40px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText(k.toString(), 32, 48);
+        const texture = new THREE.CanvasTexture(canvas);
+        const label = new THREE.Mesh(
+          new THREE.PlaneGeometry(0.2, 0.2),
+          new THREE.MeshBasicMaterial({ map: texture, transparent: true })
+        );
+        label.position.set((k - n/2) * 0.18, -0.1, 0);
+        scene.add(label);
+      });
 
-        const label = document.createElement('a-text');
-        label.setAttribute('value', k); label.setAttribute('position', `${x} -0.05 0`);
-        label.setAttribute('align', 'center'); label.setAttribute('color', '#fff');
-        label.setAttribute('scale', '0.4 0.4 0.4');
-        chart.appendChild(label);
-      }
+      // 光源
+      scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+      scene.add(new THREE.DirectionalLight(0xffffff, 0.8));
 
+      const exporter = new THREE.USDZExporter();
+      const arrayBuffer = await exporter.parse(scene);
+      const blob = new Blob([arrayBuffer], { type: 'model/usdz' });
+      return URL.createObjectURL(blob);
+    }
+
+    // 更新 UI
+    function updateUI(n, p) {
+      document.getElementById('nValue').textContent = n;
+      document.getElementById('pValue').textContent = p.toFixed(2);
+      document.getElementById('values').textContent = `n = ${n}, p = ${p.toFixed(2)}`;
       document.getElementById('formula').textContent = 
         `P(X=k) = C(${n},k) × ${p.toFixed(2)}^k × (${(1-p).toFixed(2)})^{${n}-k}`;
     }
 
-    document.addEventListener('DOMContentLoaded', () => {
-      let n = 10, p = 0.5;
-      updateChart(n, p);
-      document.getElementById('n').oninput = e => { n = +e.target.value; document.getElementById('nValue').textContent = n; updateChart(n, p); };
-      document.getElementById('p').oninput = e => { p = e.target.value/100; document.getElementById('pValue').textContent = p.toFixed(2); updateChart(n, p); };
-    });
+    // 主邏輯
+    let n = 10, p = 0.5;
+    const nSlider = document.getElementById('n');
+    const pSlider = document.getElementById('p');
+    const arButton = document.getElementById('arButton');
+
+    nSlider.oninput = () => { n = +nSlider.value; updateUI(n, p); };
+    pSlider.oninput = () => { p = pSlider.value / 100; updateUI(n, p); };
+
+    arButton.onclick = async () => {
+      arButton.disabled = true;
+      arButton.textContent = "生成中...";
+      try {
+        const usdzURL = await generateUSDZ(n, p);
+        const a = document.createElement('a');
+        a.href = usdzURL;
+        a.rel = 'ar';
+        a.setAttribute('data-usdz', '');
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(usdzURL);
+      } catch (e) {
+        alert("生成失敗，請重試");
+      }
+      arButton.disabled = false;
+      arButton.textContent = "查看 AR 3D 模型";
+    };
+
+    // 初始化
+    updateUI(n, p);
   </script>
 </body>
 </html>
