@@ -1,150 +1,158 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
-  <title>AR 二項式分布（iPhone 專用）</title>
-  <script src="https://cdn.jsdelivr.net/npm/three@0.157.0/build/three.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/three@0.157.0/examples/js/exporters/USDZExporter.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AR 二项分布可视化</title>
+
+  <!-- A-Frame -->
+  <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+  <!-- AR.js (NFT / location-based) -->
+  <script src="https://cdn.jsdelivr.net/npm/ar.js@3.4.5/aframe/build/aframe-ar-nft.js"></script>
+  
   <style>
-    body { margin: 0; padding: 20px; font-family: -apple-system; background: #f0f0f0; text-align: center; }
-    #controls { background: white; padding: 20px; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); max-width: 400px; margin: 20px auto; }
-    h2 { color: #1a1a1a; margin-bottom: 20px; }
-    label { display: block; margin: 15px 0 8px; font-weight: 600; }
-    input[type="range"] { width: 100%; height: 8px; border-radius: 4px; background: #ddd; }
-    input[type="range"]::-webkit-slider-thumb { background: #007AFF; width: 20px; height: 20px; border-radius: 50%; }
-    #values { font-size: 18px; font-weight: bold; color: #007AFF; margin: 10px 0; }
-    #arButton {
-      margin-top: 25px; padding: 14px 30px; font-size: 18px; font-weight: bold;
-      background: #007AFF; color: white; border: none; border-radius: 12px;
-      cursor: pointer; box-shadow: 0 4px 12px rgba(0,122,255,0.3);
+    body { margin:0; overflow:hidden; }
+    .info {
+      position: absolute; top: 10px; left: 10px; color: #fff;
+      background: rgba(0,0,0,0.5); padding: 8px; border-radius: 4px;
+      font-family: sans-serif; font-size: 14px;
     }
-    #arButton:active { transform: scale(0.98); }
-    #formula { margin-top: 15px; font-family: monospace; color: #555; }
-    .info { font-size: 14px; color: #666; margin-top: 30px; }
   </style>
 </head>
 <body>
 
-  <div id="controls">
-    <h2>二項式分布 AR 模型</h2>
-    
-    <label for="n">試驗次數 n: <span id="nValue">10</span></label>
-    <input type="range" id="n" min="1" max="30" value="10">
+<div class="info">请允许相机权限，模型会出现在你前方约 2 米处</div>
 
-    <label for="p">成功概率 p: <span id="pValue">0.50</span></label>
-    <input type="range" id="p" min="1" max="99" value="50" step="1">
+<a-scene
+  embedded
+  vr-mode-ui="enabled: false"
+  renderer="logarithmicDepthBuffer: true"
+  arjs="sourceType: webcam; detectionMode: mono_and_matrix; matrixCodeType: 3x3; trackingMethod: best; debugUIEnabled: false;"
+  gps-projected-camera
+>
 
-    <div id="values">n = 10, p = 0.50</div>
-    <div id="formula"></div>
+  <!-- 模型容器 -->
+  <a-entity id="modelGroup" gps-projected-position="distance:2; latitudeOffset:0; longitudeOffset:0"></a-entity>
 
-    <button id="arButton">查看 AR 3D 模型</button>
-  </div>
+  <!-- 相机 -->
+  <a-camera gps-projected-camera rotation-reader></a-camera>
 
-  <div class="info">
-    <p>iPhone / iPad 專用 • 點擊按鈕後將開啟真實 AR</p>
-  </div>
+</a-scene>
 
-  <script>
-    // 二項式計算
-    function binomialCoeff(n, k) {
-      if (k < 0 || k > n) return 0;
-      let res = 1;
-      for (let i = 1; i <= k; i++) res = res * (n - i + 1) / i;
-      return Math.round(res * 1000) / 1000;
+<script>
+  // ---------- 1. 二项分布计算 ----------
+  function C(n, k) {
+    if (k < 0 || k > n) return 0;
+    let res = 1;
+    for (let i = 1; i <= k; ++i) res = res * (n - i + 1) / i;
+    return res;
+  }
+
+  function binomialData(n, p) {
+    const data = [];
+    for (let k = 0; k <= n; ++k) {
+      const pk = C(n, k) * Math.pow(p, k) * Math.pow(1 - p, n - k);
+      data.push({k, pk});
     }
+    return data;
+  }
 
-    function binomialPMF(n, p, k) {
-      return binomialCoeff(n, k) * Math.pow(p, k) * Math.pow(1 - p, n - k);
-    }
+  // ---------- 2. 参数 ----------
+  const n = 10, p = 0.5;
+  const data = binomialData(n, p);
 
-    // 生成 USDZ 模型
-    async function generateUSDZ(n, p) {
-      const scene = new THREE.Scene();
-      const probs = Array.from({length: n+1}, (_, k) => binomialPMF(n, p, k));
-      const maxProb = Math.max(...probs, 0.1);
-      const scaleY = 1.5 / maxProb;
+  const BAR_WIDTH = 0.12;      // 柱体宽
+  const BAR_DEPTH = 0.12;      // 柱体深
+  const SPACING   = 0.18;      // 柱体间距
+  const SCALE_Y   = 8;         // 概率放大倍数（让最高柱约 2 米高）
 
-      probs.forEach((prob, k) => {
-        if (prob < 0.01) return;
-        const height = prob * scaleY;
-        const geometry = new THREE.BoxGeometry(0.15, height, 0.15);
-        const material = new THREE.MeshStandardMaterial({
-          color: new THREE.Color().setHSL(0.6 * (1 - prob/maxProb), 1, 0.5),
-          metalness: 0.3,
-          roughness: 0.4
-        });
-        const mesh = new THREE.Mesh(geometry, material);
-        mesh.position.set((k - n/2) * 0.18, height/2, 0);
-        scene.add(mesh);
+  // ---------- 3. 创建 3D 柱体 ----------
+  const scene = document.querySelector('#modelGroup');
 
-        // 標籤
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-        canvas.width = 64; canvas.height = 64;
-        ctx.fillStyle = 'white';
-        ctx.font = 'bold 40px Arial';
-        ctx.textAlign = 'center';
-        ctx.fillText(k.toString(), 32, 48);
-        const texture = new THREE.CanvasTexture(canvas);
-        const label = new THREE.Mesh(
-          new THREE.PlaneGeometry(0.2, 0.2),
-          new THREE.MeshBasicMaterial({ map: texture, transparent: true })
-        );
-        label.position.set((k - n/2) * 0.18, -0.1, 0);
-        scene.add(label);
+  data.forEach(d => {
+    const height = d.pk * SCALE_Y;
+    const xPos   = (d.k - n/2) * SPACING;
+
+    // 柱体
+    const bar = document.createElement('a-box');
+    bar.setAttribute('width', BAR_WIDTH);
+    bar.setAttribute('depth', BAR_DEPTH);
+    bar.setAttribute('height', height);
+    bar.setAttribute('position', `${xPos} ${height/2} 0`);
+    bar.setAttribute('color', '#1565c0');
+    bar.setAttribute('shadow', 'receive: true; cast: true');
+    bar.setAttribute('class', 'clickable');
+    bar.setAttribute('data-k', d.k);
+    bar.setAttribute('data-pk', d.pk.toFixed(4));
+    scene.appendChild(bar);
+
+    // X 轴标签（文字）
+    const label = document.createElement('a-text');
+    label.setAttribute('value', `${d.k}`);
+    label.setAttribute('align', 'center');
+    label.setAttribute('color', '#fff');
+    label.setAttribute('position', `${xPos} -0.08 0`);
+    label.setAttribute('rotation', '-90 0 0');
+    label.setAttribute('scale', '0.4 0.4 0.4');
+    scene.appendChild(label);
+  });
+
+  // ---------- 4. 地面（参考网格） ----------
+  const ground = document.createElement('a-plane');
+  ground.setAttribute('width', (n+1)*SPACING);
+  ground.setAttribute('depth', 2);
+  ground.setAttribute('position', `0 -0.01 0`);
+  ground.setAttribute('rotation', '-90 0 0');
+  ground.setAttribute('color', '#444');
+  ground.setAttribute('opacity', '0.6');
+  ground.setAttribute('shadow', 'receive: true');
+  scene.appendChild(ground);
+
+  // ---------- 5. 灯光 ----------
+  const ambient = document.createElement('a-light');
+  ambient.setAttribute('type', 'ambient');
+  ambient.setAttribute('color', '#bbb');
+  scene.appendChild(ambient);
+
+  const directional = document.createElement('a-light');
+  directional.setAttribute('type', 'directional');
+  directional.setAttribute('position', '2 4 2');
+  directional.setAttribute('intensity', '0.9');
+  scene.appendChild(directional);
+
+  // ---------- 6. 点击交互 ----------
+  document.querySelectorAll('.clickable').forEach(el => {
+    el.addEventListener('click', function () {
+      const k  = this.getAttribute('data-k');
+      const pk = this.getAttribute('data-pk');
+      alert(`k = ${k}\nP(k) = ${pk}`);
+    });
+  });
+
+  // ---------- 7. 提示用户 ----------
+  AFRAME.registerComponent('gps-projected-position', {
+    schema: { distance: {type: 'number', default: 2},
+              latitudeOffset: {type: 'number', default: 0},
+              longitudeOffset: {type: 'number', default: 0} },
+    init: function () {
+      const el = this.el;
+      const data = this.data;
+      // 当 GPS 位置可用时自动投影
+      el.sceneEl.addEventListener('gps-camera-update-position', e => {
+        const pos = e.detail.position;
+        const projected = new AFRAME.THREE.Vector3();
+        // 使用 AR.js 提供的投影函数
+        if (window.ARjs && window.ARjs.Utils) {
+          const lat = pos.latitude + data.latitudeOffset;
+          const lon = pos.longitude + data.longitudeOffset;
+          const projectedPos = window.ARjs.Utils.convertGeoCoordsToMeters(lat, lon, pos.latitude, pos.longitude);
+          projected.set(projectedPos.x, 0, -projectedPos.y);
+          el.object3D.position.copy(projected);
+        }
       });
-
-      // 光源
-      scene.add(new THREE.AmbientLight(0xffffff, 0.6));
-      scene.add(new THREE.DirectionalLight(0xffffff, 0.8));
-
-      const exporter = new THREE.USDZExporter();
-      const arrayBuffer = await exporter.parse(scene);
-      const blob = new Blob([arrayBuffer], { type: 'model/usdz' });
-      return URL.createObjectURL(blob);
     }
+  });
 
-    // 更新 UI
-    function updateUI(n, p) {
-      document.getElementById('nValue').textContent = n;
-      document.getElementById('pValue').textContent = p.toFixed(2);
-      document.getElementById('values').textContent = `n = ${n}, p = ${p.toFixed(2)}`;
-      document.getElementById('formula').textContent = 
-        `P(X=k) = C(${n},k) × ${p.toFixed(2)}^k × (${(1-p).toFixed(2)})^{${n}-k}`;
-    }
-
-    // 主邏輯
-    let n = 10, p = 0.5;
-    const nSlider = document.getElementById('n');
-    const pSlider = document.getElementById('p');
-    const arButton = document.getElementById('arButton');
-
-    nSlider.oninput = () => { n = +nSlider.value; updateUI(n, p); };
-    pSlider.oninput = () => { p = pSlider.value / 100; updateUI(n, p); };
-
-    arButton.onclick = async () => {
-      arButton.disabled = true;
-      arButton.textContent = "生成中...";
-      try {
-        const usdzURL = await generateUSDZ(n, p);
-        const a = document.createElement('a');
-        a.href = usdzURL;
-        a.rel = 'ar';
-        a.setAttribute('data-usdz', '');
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(usdzURL);
-      } catch (e) {
-        alert("生成失敗，請重試");
-      }
-      arButton.disabled = false;
-      arButton.textContent = "查看 AR 3D 模型";
-    };
-
-    // 初始化
-    updateUI(n, p);
-  </script>
+</script>
 </body>
 </html>
