@@ -3,72 +3,49 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>AR 二项式分布 3D 模型</title>
-  
-  <!-- 关键：使用 NFT 版本的 AR.js（iPhone 最稳定）-->
+  <title>AR 二項式分布 3D 模型</title>
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/ar.js@3.4.0/aframe/build/aframe-ar-nft.js"></script>
-
+  <script src="https://cdn.jsdelivr.net/npm/ar.js@3.4.0/aframe/build/aframe-ar.min.js"></script>
   <style>
-    body { margin: 0; overflow: hidden; font-family: -apple-system, sans-serif; background: #000; }
+    body { margin: 0; overflow: hidden; }
     #controls {
       position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
       background: rgba(0,0,0,0.8); color: #fff; padding: 16px; border-radius: 16px;
-      text-align: center; width: 90%; max-width: 420px; z-index: 1000; backdrop-filter: blur(10px);
+      text-align: center; width: 90%; max-width: 420px; z-index: 100; backdrop-filter: blur(10px);
     }
-    h3 { margin: 0 0 12px; font-size: 18px; }
-    label { display: block; margin: 12px 0 6px; font-size: 14px; }
     .slider { width: 100%; height: 8px; border-radius: 4px; background: #444; }
     .slider::-webkit-slider-thumb { width: 20px; height: 20px; border-radius: 50%; background: #4A9EFF; }
-    #formula { margin-top: 12px; font-size: 15px; color: #A0D8FF; font-weight: 600; }
-    #nValue, #pValue { color: #4A9EFF; font-weight: bold; }
-    #loading { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #fff; font-size: 18px; z-index: 999; }
   </style>
 </head>
 <body>
 
-  <!-- 加载提示 -->
-  <div id="loading">正在加载 AR 引擎...</div>
-
-  <!-- A-Frame 场景 -->
   <a-scene
     embedded
-    arjs="sourceType: webcam; trackingMethod: best; detectionMode: mono_and_matrix; matrixCodeType: 3x3; debugUIEnabled: false;"
-    renderer="logarithmicDepthBuffer: true; antialias: true;"
+    arjs="sourceType: webcam; trackingMethod: best; debugUIEnabled: false;"
+    renderer="logarithmicDepthBuffer: true; physicallyCorrectLights: true;"
     vr-mode-ui="enabled: false"
-    device-orientation-permission-ui="enabled: false"
-    id="scene">
-    
-    <!-- 3D 图表容器 -->
-    <a-entity id="chart" position="0 0.1 -1" scale="0.5 0.5 0.5"></a-entity>
+    device-orientation-permission-ui="enabled: false">
 
-    <!-- 光源 -->
-    <a-entity light="type: ambient; intensity: 0.7"></a-entity>
+    <a-marker preset="hiro">
+      <a-entity id="chart" position="0 0.1 0" scale="0.5 0.5 0.5"></a-entity>
+    </a-marker>
+
+    <a-entity light="type: ambient; intensity: 0.6"></a-entity>
     <a-entity light="type: directional; intensity: 0.8" position="2 3 1"></a-entity>
 
-    <!-- 相机 -->
     <a-entity camera></a-entity>
   </a-scene>
 
-  <!-- 控制面板 -->
-  <div id="controls" style="display:none;">
-    <h3>二项式分布 B(n, p)</h3>
-    <label for="n">试验次数 n: <span id="nValue">10</span></label>
+  <div id="controls">
+    <h3>二項式分布 B(n, p)</h3>
+    <label for="n">n: <span id="nValue">10</span></label>
     <input type="range" id="n" class="slider" min="1" max="50" value="10">
-    <label for="p">成功概率 p: <span id="pValue">0.50</span></label>
+    <label for="p">p: <span id="pValue">0.50</span></label>
     <input type="range" id="p" class="slider" min="1" max="99" value="50" step="1">
     <div id="formula"></div>
   </div>
 
   <script>
-    // 隐藏加载提示
-    function hideLoading() {
-      const loading = document.getElementById('loading');
-      if (loading) loading.style.display = 'none';
-      document.getElementById('controls').style.display = 'block';
-    }
-
-    // 二项式计算
     function binomialCoeff(n, k) {
       if (k < 0 || k > n) return 0;
       let res = 1;
@@ -80,68 +57,40 @@
       return binomialCoeff(n, k) * Math.pow(p, k) * Math.pow(1 - p, n - k);
     }
 
-    // 更新图表
     function updateChart(n, p) {
       const chart = document.getElementById('chart');
       chart.innerHTML = '';
+      const maxProb = Math.max(...Array.from({length: n+1}, (_, k) => binomialPMF(n, p, k)));
+      const scaleY = 1.0 / (maxProb || 1);
 
-      const probs = Array.from({ length: n + 1 }, (_, k) => binomialPMF(n, p, k));
-      const maxProb = Math.max(...probs, 1);
-      const scaleY = 0.8 / maxProb;
-
-      probs.forEach((prob, k) => {
+      for (let k = 0; k <= n; k++) {
+        const prob = binomialPMF(n, p, k);
         const height = prob * scaleY;
-        if (height < 0.02) return;
-        const x = (k - n / 2) * 0.2;
+        if (height < 0.02) continue;
+        const x = (k - n/2) * 0.1;
 
         const bar = document.createElement('a-box');
-        bar.setAttribute('position', `${x} ${height / 2} 0`);
-        bar.setAttribute('width', 0.16);
-        bar.setAttribute('height', height);
-        bar.setAttribute('depth', 0.12);
-        bar.setAttribute('color', `hsl(${240 * (1 - prob / maxProb)}, 100%, 60%)`);
+        bar.setAttribute('position', `${x} ${height/2} 0`);
+        bar.setAttribute('width', '0.08'); bar.setAttribute('height', height);
+        bar.setAttribute('depth', '0.08'); bar.setAttribute('color', `hsl(${240*(1-prob/maxProb)},100%,55%)`);
         chart.appendChild(bar);
 
         const label = document.createElement('a-text');
-        label.setAttribute('value', k.toString());
-        label.setAttribute('position', `${x} -0.05 0`);
-        label.setAttribute('align', 'center');
-        label.setAttribute('color', '#fff');
-        label.setAttribute('scale', '0.6 0.6 0.6');
+        label.setAttribute('value', k); label.setAttribute('position', `${x} -0.05 0`);
+        label.setAttribute('align', 'center'); label.setAttribute('color', '#fff');
+        label.setAttribute('scale', '0.4 0.4 0.4');
         chart.appendChild(label);
-      });
+      }
 
-      document.getElementById('formula').textContent =
+      document.getElementById('formula').textContent = 
         `P(X=k) = C(${n},k) × ${p.toFixed(2)}^k × (${(1-p).toFixed(2)})^{${n}-k}`;
     }
 
-    // 初始化
     document.addEventListener('DOMContentLoaded', () => {
-      setTimeout(hideLoading, 2000); // 2秒后显示 UI
-
       let n = 10, p = 0.5;
       updateChart(n, p);
-
-      document.getElementById('n').addEventListener('input', e => {
-        n = parseInt(e.target.valueVue);
-        document.getElementById('nValue').textContent = n;
-        updateChart(n, p);
-      });
-
-      document.getElementById('p').addEventListener('input', e => {
-        p = e.target.value / 100;
-        document.getElementById('pValue').textContent = p.toFixed(2);
-        updateChart(n, p);
-      });
-    });
-
-    // iPhone 强制刷新
-    window.addEventListener('load', () => {
-      setTimeout(() => {
-        if (document.querySelector('a-scene').hasLoaded) {
-          hideLoading();
-        }
-      }, 3000);
+      document.getElementById('n').oninput = e => { n = +e.target.value; document.getElementById('nValue').textContent = n; updateChart(n, p); };
+      document.getElementById('p').oninput = e => { p = e.target.value/100; document.getElementById('pValue').textContent = p.toFixed(2); updateChart(n, p); };
     });
   </script>
 </body>
