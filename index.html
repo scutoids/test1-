@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>AR 二项分布 - 射线贴地 + 可拖动</title>
+  <title>AR 二项分布 - 可旋转 + 智能 UI</title>
 
   <!-- A-Frame & AR.js -->
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
@@ -13,41 +13,92 @@
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { overflow: hidden; font-family: -apple-system, sans-serif; background: #000; }
-    
-    .info, .lidar-status, .control, .hint {
-      position: absolute; color: #fff; border-radius: 12px; z-index: 100; text-align: center; font-size: 15px; padding: 10px 16px;
+
+    /* 顶部信息 */
+    .info {
+      position: absolute; top: 15px; left: 15px; right: 15px;
+      color: #fff; background: rgba(0,0,0,0.7); padding: 10px 14px;
+      border-radius: 12px; font-size: 14px; text-align: center; z-index: 100;
+      backdrop-filter: blur(4px); transition: opacity 0.3s;
     }
-    .info { top: 15px; left: 15px; right: 15px; background: rgba(0,0,0,0.7); backdrop-filter: blur(4px); }
-    .lidar-status { top: 80px; left: 50%; transform: translateX(-50%); background: #34c759; font-weight: bold; font-size: 13px; padding: 6px 16px; display: none; }
-    .control { bottom: 30px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.85); backdrop-filter: blur(8px); width: 90%; max-width: 360px; padding: 16px; border-radius: 18px; box-shadow: 0 6px 20px rgba(0,0,0,0.4); }
-    .hint { bottom: 100px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.7); padding: 8px 16px; border-radius: 20px; font-size: 13px; }
+
+    /* LiDAR 状态 */
+    .lidar-status {
+      position: absolute; top: 70px; left: 50%; transform: translateX(-50%);
+      background: #34c759; color: white; padding: 6px 16px; border-radius: 20px;
+      font-size: 13px; font-weight: bold; z-index: 100; display: none;
+    }
+
+    /* 控制面板 - 可折叠 */
+    .control {
+      position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%);
+      background: rgba(0,0,0,0.85); backdrop-filter: blur(10px);
+      width: 90%; max-width: 360px; border-radius: 18px;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.4); z-index: 100;
+      transition: all 0.3s ease; overflow: hidden;
+    }
+    .control.collapsed { height: 50px; padding: 12px 16px; }
+    .control.expanded { padding: 20px 16px; }
+
+    .control-header {
+      display: flex; justify-content: space-between; align-items: center; cursor: pointer;
+      font-weight: 600; font-size: 15px; user-select: none;
+    }
+    .toggle-icon { {
+      font-size: 20px; transition: transform 0.3s;
+    }
+    .control.collapsed .toggle-icon { transform: rotate(180deg); }
+
+    .sliders { margin-top: 16px; opacity: 1; transition: opacity 0.3s; }
+    .control.collapsed .sliders { opacity: 0; pointer-events: none; height: 0; margin: 0; }
 
     .slider-container { margin: 14px 0; }
-    .slider-label { display: block; margin-bottom: 8px; font-weight: 600; }
+    .slider-label { display: block; margin-bottom: 8px; font-weight: 600; font-size: 14px; }
     .slider-value { display: inline-block; width: 60px; color: #4a90e2; font-weight: bold; }
+
     input[type="range"] {
-      -webkit-appearance: none; width: 100%; height: 8px; border-radius: 5px; background: #444; outline: none; margin: 10px 0;
+      -webkit-appearance: none; width: 100%; height: 8px; border-radius: 5px;
+      background: #444; outline: none; margin: 10px 0;
     }
     input[type="range"]::-webkit-slider-thumb {
-      -webkit-appearance: none; width: 24px; height: 24px; border-radius: 50%; background: #007aff; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+      -webkit-appearance: none; width: 24px; height: 24px; border-radius: 50%;
+      background: #007aff; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.3);
     }
+
+    /* 手势提示 */
+    .gesture-hint {
+      position: absolute; bottom: 100px; left: 50%; transform: translateX(-50%);
+      background: rgba(0,0,0,0.7); color: #fff; padding: 8px 16px;
+      border-radius: 20px; font-size: 13px; z-index: 100; white-space: nowrap;
+    }
+
+    /* 拖动时 UI 变透明 */
+    .ui-dragging { opacity: 0.3 !important; }
   </style>
 </head>
 <body>
 
   <div class="info" id="info">启动中…</div>
   <div class="lidar-status" id="lidarStatus">实时贴地中</div>
-  <div class="hint">点击柱子查看概率，长按拖动图表</div>
 
-  <!-- 控制面板 -->
-  <div class="control">
-    <div class="slider-container">
-      <span class="slider-label">n (试验次数): <span class="slider-value" id="nValue">10</span></span>
-      <input type="range" min="1" max="20" value="10" id="nSlider">
+  <!-- 手势提示 -->
+  <div class="gesture-hint">单指拖动 · 双指旋转</div>
+
+  <!-- 控制面板（可折叠） -->
+  <div class="control expanded" id="controlPanel">
+    <div class="control-header" onclick="togglePanel()">
+      <span>参数设置</span>
+      <span class="toggle-icon">▲</span>
     </div>
-    <div class="slider-container">
-      <span class="slider-label">p (成功概率): <span class="slider-value" id="pValue">0.50</span></span>
-      <input type="range" min="0" max="100" value="50" step="1" id="pSlider">
+    <div class="sliders">
+      <div class="slider-container">
+        <span class="slider-label">n (试验次数): <span class="slider-value" id="nValue">10</span></span>
+        <input type="range" min="1" max="20" value="10" id="nSlider">
+      </div>
+      <div class="slider-container">
+        <span class="slider-label">p (成功概率): <span class="slider-value" id="pValue">0.50</span></span>
+        <input type="range" min="0" max="100" value="50" step="1" id="pSlider">
+      </div>
     </div>
   </div>
 
@@ -61,8 +112,7 @@
     aframe-arkit-device
     light="ambientIntensity: 1.5; environment: default;"
   >
-    <!-- 模型组：射线贴地 + 手势拖动 -->
-    <a-entity id="modelGroup" position="0 0.1 -1" scale="0.5 0.5 0.5" ground-tracker drag-handler></a-entity>
+    <a-entity id="modelGroup" position="0 0.1 -1" scale="0.5 0.5 0.5" ground-tracker gesture-handler></a-entity>
     <a-camera></a-camera>
   </a-scene>
 
@@ -76,12 +126,19 @@
     const scene = document.querySelector('#modelGroup');
     const infoEl = document.getElementById('info');
     const lidarEl = document.getElementById('lidarStatus');
+    const controlPanel = document.getElementById('controlPanel');
     const nSlider = document.getElementById('nSlider');
     const pSlider = document.getElementById('pSlider');
     const nValue = document.getElementById('nValue');
     const pValue = document.getElementById('pValue');
 
     let currentN = 10, currentP = 0.5;
+
+    // ========== 折叠面板 ==========
+    function togglePanel() {
+      controlPanel.classList.toggle('collapsed');
+      controlPanel.classList.toggle('expanded');
+    }
 
     // ========== 数学函数 ==========
     function C(n, k) {
@@ -111,7 +168,6 @@
         const height = d.pk * SCALE_Y;
         const xPos = (d.k - n / 2) * SPACING;
 
-        // 柱子
         const bar = document.createElement('a-box');
         bar.setAttribute('width', BAR_WIDTH);
         bar.setAttribute('depth', BAR_WIDTH);
@@ -126,7 +182,6 @@
         bar.setAttribute('data-pk', d.pk.toFixed(4));
         scene.appendChild(bar);
 
-        // 标签
         const label = document.createElement('a-text');
         label.setAttribute('value', d.k.toString());
         label.setAttribute('align', 'center');
@@ -137,7 +192,6 @@
         scene.appendChild(label);
       });
 
-      // 地面
       const ground = document.createElement('a-plane');
       ground.setAttribute('width', (n + 3) * SPACING);
       ground.setAttribute('depth', 1.5);
@@ -152,10 +206,10 @@
 
     function updateChart() {
       drawChart(currentN, currentP);
-      infoEl.innerHTML = `实时更新<br>n=${currentN}, p=${currentP.toFixed(2)}`;
+      infoEl.innerHTML = `n=${currentN}, p=${currentP.toFixed(2)}`;
     }
 
-    // ========== 滑块事件 ==========
+    // ========== 滑块 ==========
     nSlider.addEventListener('input', () => {
       currentN = parseInt(nSlider.value);
       nValue.textContent = currentN;
@@ -178,7 +232,7 @@
       }
     });
 
-    // ========== 组件 1：射线检测地面（实时贴地）==========
+    // ========== 组件：射线贴地 ==========
     AFRAME.registerComponent('ground-tracker', {
       tick: function () {
         const camera = this.el.sceneEl.camera;
@@ -186,38 +240,65 @@
 
         const raycaster = new THREE.Raycaster();
         const origin = camera.getWorldPosition(new THREE.Vector3());
-        const direction = new THREE.Vector3(0, -1, 0); // 向下
-        raycaster.set(origin, direction);
+        raycaster.set(origin, new THREE.Vector3(0, -1, 0));
 
         const intersects = raycaster.intersectObjects(this.el.sceneEl.object3D.children, true);
         if (intersects.length > 0) {
           const groundY = intersects[0].point.y;
-          this.el.object3D.position.y = groundY + 0.08; // 抬高 8cm
+          this.el.object3D.position.y = groundY + 0.08;
           lidarEl.style.display = 'block';
         }
       }
     });
 
-    // ========== 组件 2：手势拖动（X/Z 平移）==========
-    AFRAME.registerComponent('drag-handler', {
+    // ========== 组件：手势控制（拖动 + 旋转）==========
+    AFRAME.registerComponent('gesture-handler', {
       init: function () {
-        let startX, startZ, isDragging = false;
+        let startX, startZ, startRotY, isDragging = false;
 
-        this.el.addEventListener('mousedown', () => { isDragging = true; });
-        this.el.addEventListener('mouseup', () => { isDragging = false; });
-        this.el.addEventListener('mouseleave', () => { isDragging = false; });
-
+        // 单指拖动
         this.el.addEventListener('gesturestart', e => {
-          const pos = this.el.object3D.position;
-          startX = pos.x;
-          startZ = pos.z;
+          if (e.detail.touches === 1) {
+            const pos = this.el.object3D.position;
+            startX = pos.x;
+            startZ = pos.z;
+            isDragging = true;
+            document.body.classList.add('ui-dragging');
+          }
         });
 
         this.el.addEventListener('gesturechange', e => {
-          if (!isDragging) return;
+          if (!isDragging || e.detail.touches !== 1) return;
           const delta = e.detail.delta;
           this.el.object3D.position.x = startX + delta.x * 0.001;
           this.el.object3D.position.z = startZ + delta.z * 0.001;
+        });
+
+        this.el.addEventListener('gestureend', () => {
+          isDragging = false;
+          document.body.classList.remove('ui-dragging');
+        });
+
+        // 双指旋转
+        let lastAngle = 0;
+        this.el.addEventListener('gesturestart', e => {
+          if (e.detail.touches === 2) {
+            const touches = e.detail.touches;
+            const dx = touches[0].clientX - touches[1].clientX;
+            const dy = touches[0].clientY - touches[1].clientY;
+            lastAngle = Math.atan2(dy, dx);
+          }
+        });
+
+        this.el.addEventListener('gesturechange', e => {
+          if (e.detail.touches !== 2) return;
+          const touches = e.detail.touches;
+          const dx = touches[0].clientX - touches[1].clientX;
+          const dy = touches[0].clientY - touches[1].clientY;
+          const angle = Math.atan2(dy, dx);
+          const deltaAngle = angle - lastAngle;
+          this.el.object3D.rotation.y += deltaAngle;
+          lastAngle = angle;
         });
       }
     });
@@ -226,7 +307,7 @@
     window.onload = () => {
       setTimeout(() => {
         drawChart(currentN, currentP);
-        infoEl.innerHTML = '就绪！拖动滑块或长按拖动图表';
+        infoEl.innerHTML = '就绪！点击标题折叠面板';
       }, 1500);
     };
   </script>
