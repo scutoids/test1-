@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>AR 二项分布 - 可旋转 + 智能 UI</title>
+  <title>AR 二项分布 - UI 稳定版</title>
 
   <!-- A-Frame & AR.js -->
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
@@ -12,14 +12,14 @@
 
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { overflow: hidden; font-family: -apple-system, sans-serif; background: #000; }
+    body { overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: #000; }
 
     /* 顶部信息 */
     .info {
       position: absolute; top: 15px; left: 15px; right: 15px;
-      color: #fff; background: rgba(0,0,0,0.7); padding: 10px 14px;
+      color: #fff; background: rgba(0, 0, 0, 0.85); padding: 10px 14px;
       border-radius: 12px; font-size: 14px; text-align: center; z-index: 100;
-      backdrop-filter: blur(4px); transition: opacity 0.3s;
+      backdrop-filter: blur(6px); transition: opacity 0.3s ease;
     }
 
     /* LiDAR 状态 */
@@ -29,64 +29,85 @@
       font-size: 13px; font-weight: bold; z-index: 100; display: none;
     }
 
-    /* 控制面板 - 可折叠 */
+    /* 控制面板 */
     .control {
       position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%);
-      background: rgba(0,0,0,0.85); backdrop-filter: blur(10px);
       width: 90%; max-width: 360px; border-radius: 18px;
-      box-shadow: 0 6px 20px rgba(0,0,0,0.4); z-index: 100;
-      transition: all 0.3s ease; overflow: hidden;
+      background: rgba(0, 0, 0, 0.92); backdrop-filter: blur(12px);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.5); z-index: 100;
+      overflow: hidden; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     }
-    .control.collapsed { height: 50px; padding: 12px 16px; }
-    .control.expanded { padding: 20px 16px; }
+    .control.collapsed { height: 56px; padding: 0 16px; }
+    .control.expanded { padding: 20px 16px 24px; }
 
     .control-header {
-      display: flex; justify-content: space-between; align-items: center; cursor: pointer;
-      font-weight: 600; font-size: 15px; user-select: none;
+      display: flex; justify-content: space-between; align-items: center;
+      height: 56px; cursor: pointer; user-select: none; font-weight: 600; font-size: 15px;
+      color: #fff; border-bottom: 1px solid rgba(255,255,255,0.1);
     }
-    .toggle-icon { {
-      font-size: 20px; transition: transform 0.3s;
+    .toggle-icon {
+      font-size: 20px; transition: transform 0.3s ease;
     }
     .control.collapsed .toggle-icon { transform: rotate(180deg); }
 
-    .sliders { margin-top: 16px; opacity: 1; transition: opacity 0.3s; }
-    .control.collapsed .sliders { opacity: 0; pointer-events: none; height: 0; margin: 0; }
+    .sliders {
+      margin-top: 16px; opacity: 1; transition: all 0.3s ease;
+      pointer-events: auto;
+    }
+    .control.collapsed .sliders {
+      opacity: 0; height: 0; margin: 0; padding: 0; overflow: hidden;
+      pointer-events: none;
+    }
 
-    .slider-container { margin: 14px 0; }
-    .slider-label { display: block; margin-bottom: 8px; font-weight: 600; font-size: 14px; }
-    .slider-value { display: inline-block; width: 60px; color: #4a90e2; font-weight: bold; }
+    .slider-container {
+      margin: 16px 0;
+    }
+    .slider-label {
+      display: block; margin-bottom: 8px; font-weight: 600; font-size: 14px; color: #fff;
+    }
+    .slider-value {
+      display: inline-block; width: 60px; color: #4a90e2; font-weight: bold; font-size: 14px;
+    }
 
+    /* 强制修复滑块样式 */
     input[type="range"] {
-      -webkit-appearance: none; width: 100%; height: 8px; border-radius: 5px;
-      background: #444; outline: none; margin: 10px 0;
+      -webkit-appearance: none !important;
+      width: 100%; height: 8px; border-radius: 5px;
+      background: #444 !important; outline: none !important;
+      margin: 12px 0; cursor: pointer;
+    }
+    input[type="range"]::-webkit-slider-runnable-track {
+      height: 8px; border-radius: 5px; background: #444;
     }
     input[type="range"]::-webkit-slider-thumb {
-      -webkit-appearance: none; width: 24px; height: 24px; border-radius: 50%;
-      background: #007aff; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+      -webkit-appearance: none !important;
+      width: 24px; height: 24px; border-radius: 50%;
+      background: #007aff !important; cursor: pointer;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+      margin-top: -8px;
     }
 
     /* 手势提示 */
     .gesture-hint {
       position: absolute; bottom: 100px; left: 50%; transform: translateX(-50%);
-      background: rgba(0,0,0,0.7); color: #fff; padding: 8px 16px;
+      background: rgba(0,0,0,0.8); color: #fff; padding: 8px 16px;
       border-radius: 20px; font-size: 13px; z-index: 100; white-space: nowrap;
+      transition: opacity 0.3s;
     }
 
-    /* 拖动时 UI 变透明 */
-    .ui-dragging { opacity: 0.3 !important; }
+    /* 拖动时 UI 淡出 */
+    .ui-dragging * { opacity: 0.3 !important; transition: opacity 0.2s !important; }
   </style>
 </head>
 <body>
 
   <div class="info" id="info">启动中…</div>
   <div class="lidar-status" id="lidarStatus">实时贴地中</div>
+  <div class="gesture-hint" id="gestureHint">单指拖动 · 双指旋转 · 双击标题隐藏</div>
 
-  <!-- 手势提示 -->
-  <div class="gesture-hint">单指拖动 · 双指旋转</div>
-
-  <!-- 控制面板（可折叠） -->
+  <!-- 控制面板 -->
   <div class="control expanded" id="controlPanel">
-    <div class="control-header" onclick="togglePanel()">
+    <div class="control-header" id="panelHeader">
       <span>参数设置</span>
       <span class="toggle-icon">▲</span>
     </div>
@@ -118,29 +139,43 @@
 
   <script>
     // ========== 配置 ==========
-    const SCALE_Y = 6;
-    const BAR_WIDTH = 0.08;
-    const SPACING = 0.12;
+    const SCALE_Y = 6, BAR_WIDTH = 0.08, SPACING = 0.12;
 
     // ========== DOM ==========
     const scene = document.querySelector('#modelGroup');
     const infoEl = document.getElementById('info');
     const lidarEl = document.getElementById('lidarStatus');
     const controlPanel = document.getElementById('controlPanel');
+    const panelHeader = document.getElementById('panelHeader');
+    const gestureHint = document.getElementById('gestureHint');
     const nSlider = document.getElementById('nSlider');
     const pSlider = document.getElementById('pSlider');
     const nValue = document.getElementById('nValue');
     const pValue = document.getElementById('pValue');
 
     let currentN = 10, currentP = 0.5;
+    let clickCount = 0, clickTimer = null;
 
-    // ========== 折叠面板 ==========
-    function togglePanel() {
-      controlPanel.classList.toggle('collapsed');
-      controlPanel.classList.toggle('expanded');
-    }
+    // ========== 面板控制 ==========
+    panelHeader.addEventListener('click', () => {
+      clickCount++;
+      if (clickCount === 1) {
+        clickTimer = setTimeout(() => {
+          // 单机：折叠
+          controlPanel.classList.toggle('collapsed');
+          controlPanel.classList.toggle('expanded');
+          clickCount = 0;
+        }, 300);
+      } else if (clickCount === 2) {
+        // 双击：完全隐藏
+        clearTimeout(clickTimer);
+        controlPanel.style.display = controlPanel.style.display === 'none' ? 'block' : 'none';
+        gestureHint.style.opacity = controlPanel.style.display === 'none' ? '0.5' : '1';
+        clickCount = 0;
+      }
+    });
 
-    // ========== 数学函数 ==========
+    // ========== 数学 & 绘图 ==========
     function C(n, k) {
       if (k < 0 || k > n) return 0;
       let res = 1;
@@ -157,7 +192,6 @@
       return data;
     }
 
-    // ========== 绘图 ==========
     function drawChart(n, p) {
       while (scene.firstChild) scene.removeChild(scene.firstChild);
       const data = binomialData(n, p);
@@ -169,38 +203,22 @@
         const xPos = (d.k - n / 2) * SPACING;
 
         const bar = document.createElement('a-box');
-        bar.setAttribute('width', BAR_WIDTH);
-        bar.setAttribute('depth', BAR_WIDTH);
-        bar.setAttribute('height', height);
         bar.setAttribute('position', `${xPos} ${baseY + height / 2} 0`);
-        bar.setAttribute('color', '#4a90e2');
-        bar.setAttribute('metalness', '0.1');
-        bar.setAttribute('roughness', '0.7');
-        bar.setAttribute('shadow', 'cast: true; receive: true');
-        bar.setAttribute('class', 'clickable');
-        bar.setAttribute('data-k', d.k);
-        bar.setAttribute('data-pk', d.pk.toFixed(4));
+        bar.setAttribute('width', BAR_WIDTH); bar.setAttribute('depth', BAR_WIDTH); bar.setAttribute('height', height);
+        bar.setAttribute('color', '#4a90e2'); bar.setAttribute('class', 'clickable');
+        bar.setAttribute('data-k', d.k); bar.setAttribute('data-pk', d.pk.toFixed(4));
         scene.appendChild(bar);
 
         const label = document.createElement('a-text');
-        label.setAttribute('value', d.k.toString());
-        label.setAttribute('align', 'center');
-        label.setAttribute('color', '#fff');
-        label.setAttribute('position', `${xPos} ${baseY - 0.05} 0`);
-        label.setAttribute('rotation', '-90 0 0');
-        label.setAttribute('scale', '0.3 0.3 0.3');
+        label.setAttribute('value', d.k); label.setAttribute('position', `${xPos} ${baseY - 0.05} 0`);
+        label.setAttribute('rotation', '-90 0 0'); label.setAttribute('scale', '0.3 0.3 0.3'); label.setAttribute('color', '#fff');
         scene.appendChild(label);
       });
 
       const ground = document.createElement('a-plane');
-      ground.setAttribute('width', (n + 3) * SPACING);
-      ground.setAttribute('depth', 1.5);
-      ground.setAttribute('position', `0 ${baseY} 0`);
-      ground.setAttribute('rotation', '-90 0 0');
-      ground.setAttribute('color', '#333');
-      ground.setAttribute('opacity', '0.8');
-      ground.setAttribute('transparent', 'true');
-      ground.setAttribute('shadow', 'receive: true');
+      ground.setAttribute('position', `0 ${baseY} 0`); ground.setAttribute('rotation', '-90 0 0');
+      ground.setAttribute('width', (n + 3) * SPACING); ground.setAttribute('depth', 1.5);
+      ground.setAttribute('color', '#333'); ground.setAttribute('opacity', '0.8'); ground.setAttribute('transparent', 'true');
       scene.appendChild(ground);
     }
 
@@ -209,96 +227,64 @@
       infoEl.innerHTML = `n=${currentN}, p=${currentP.toFixed(2)}`;
     }
 
-    // ========== 滑块 ==========
-    nSlider.addEventListener('input', () => {
-      currentN = parseInt(nSlider.value);
-      nValue.textContent = currentN;
-      updateChart();
-    });
+    nSlider.addEventListener('input', () => { currentN = +nSlider.value; nValue.textContent = currentN; updateChart(); });
+    pSlider.addEventListener('input', () => { currentP = pSlider.value / 100; pValue.textContent = currentP.toFixed(2); updateChart(); });
 
-    pSlider.addEventListener('input', () => {
-      currentP = pSlider.value / 100;
-      pValue.textContent = currentP.toFixed(2);
-      updateChart();
-    });
-
-    // ========== 点击柱子 ==========
     scene.addEventListener('click', e => {
-      const el = e.target;
-      if (el.classList.contains('clickable')) {
-        const k = el.getAttribute('data-k');
-        const pk = el.getAttribute('data-pk');
-        alert(`B(${currentN}, ${currentP.toFixed(2)})\nP(X = ${k}) = ${pk}`);
+      if (e.target.classList.contains('clickable')) {
+        const k = e.target.getAttribute('data-k'), pk = e.target.getAttribute('data-pk');
+        alert(`P(X=${k}) = ${pk}`);
       }
     });
 
-    // ========== 组件：射线贴地 ==========
+    // ========== 射线贴地 ==========
     AFRAME.registerComponent('ground-tracker', {
       tick: function () {
         const camera = this.el.sceneEl.camera;
         if (!camera) return;
-
-        const raycaster = new THREE.Raycaster();
-        const origin = camera.getWorldPosition(new THREE.Vector3());
-        raycaster.set(origin, new THREE.Vector3(0, -1, 0));
-
-        const intersects = raycaster.intersectObjects(this.el.sceneEl.object3D.children, true);
-        if (intersects.length > 0) {
-          const groundY = intersects[0].point.y;
-          this.el.object3D.position.y = groundY + 0.08;
+        const ray = new THREE.Raycaster(camera.getWorldPosition(new THREE.Vector3()), new THREE.Vector3(0, -1, 0));
+        const hits = ray.intersectObjects(this.el.sceneEl.object3D.children, true);
+        if (hits[0]) {
+          this.el.object3D.position.y = hits[0].point.y + 0.08;
           lidarEl.style.display = 'block';
         }
       }
     });
 
-    // ========== 组件：手势控制（拖动 + 旋转）==========
+    // ========== 手势控制 ==========
     AFRAME.registerComponent('gesture-handler', {
       init: function () {
         let startX, startZ, startRotY, isDragging = false;
 
-        // 单指拖动
         this.el.addEventListener('gesturestart', e => {
           if (e.detail.touches === 1) {
             const pos = this.el.object3D.position;
-            startX = pos.x;
-            startZ = pos.z;
-            isDragging = true;
+            startX = pos.x; startZ = pos.z; isDragging = true;
             document.body.classList.add('ui-dragging');
+          } else if (e.detail.touches === 2) {
+            const [t1, t2] = e.detail.touches;
+            startRotY = this.el.object3D.rotation.y;
+            const dx = t1.clientX - t2.clientX, dy = t1.clientY - t2.clientY;
+            this.lastAngle = Math.atan2(dy, dx);
           }
         });
 
         this.el.addEventListener('gesturechange', e => {
-          if (!isDragging || e.detail.touches !== 1) return;
-          const delta = e.detail.delta;
-          this.el.object3D.position.x = startX + delta.x * 0.001;
-          this.el.object3D.position.z = startZ + delta.z * 0.001;
+          if (isDragging && e.detail.touches === 1) {
+            const delta = e.detail.delta;
+            this.el.object3D.position.x = startX + delta.x * 0.001;
+            this.el.object3D.position.z = startZ + delta.z * 0.001;
+          } else if (e.detail.touches === 2) {
+            const [t1, t2] = e.detail.touches;
+            const dx = t1.clientX - t2.clientX, dy = t1.clientY - t2.clientY;
+            const angle = Math.atan2(dy, dx);
+            this.el.object3D.rotation.y = startRotY + (angle - this.lastAngle);
+          }
         });
 
         this.el.addEventListener('gestureend', () => {
           isDragging = false;
           document.body.classList.remove('ui-dragging');
-        });
-
-        // 双指旋转
-        let lastAngle = 0;
-        this.el.addEventListener('gesturestart', e => {
-          if (e.detail.touches === 2) {
-            const touches = e.detail.touches;
-            const dx = touches[0].clientX - touches[1].clientX;
-            const dy = touches[0].clientY - touches[1].clientY;
-            lastAngle = Math.atan2(dy, dx);
-          }
-        });
-
-        this.el.addEventListener('gesturechange', e => {
-          if (e.detail.touches !== 2) return;
-          const touches = e.detail.touches;
-          const dx = touches[0].clientX - touches[1].clientX;
-          const dy = touches[0].clientY - touches[1].clientY;
-          const angle = Math.atan2(dy, dx);
-          const deltaAngle = angle - lastAngle;
-          this.el.object3D.rotation.y += deltaAngle;
-          lastAngle = angle;
         });
       }
     });
@@ -306,8 +292,8 @@
     // ========== 初始化 ==========
     window.onload = () => {
       setTimeout(() => {
-        drawChart(currentN, currentP);
-        infoEl.innerHTML = '就绪！点击标题折叠面板';
+        drawChart(10, 0.5);
+        infoEl.innerHTML = '就绪！双击标题隐藏面板';
       }, 1500);
     };
   </script>
