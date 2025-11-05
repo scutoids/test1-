@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>AR 二项分布 - 放大缩小按钮</title>
+  <title>AR 二项分布 - 无旋转 + 双指缩放</title>
 
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
   <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar-nft.js"></script>
@@ -65,18 +65,6 @@
       border-radius: 20px; font-size: 13px; z-index: 100;
     }
 
-    /* 放大缩小按钮 */
-    .zoom-controls {
-      position: absolute; bottom: 100px; right: 20px; z-index: 100; display: flex; gap: 12px;
-    }
-    .zoom-btn {
-      background: #007aff; color: white; border: none; width: 44px; height: 44px;
-      border-radius: 50%; font-size: 20px; font-weight: bold;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.3); cursor: pointer;
-      display: flex; align-items: center; justify-content: center;
-    }
-    .zoom-btn:active { transform: scale(0.9); }
-
     .ui-dragging * { opacity: 0.3 !important; }
   </style>
 </head>
@@ -84,13 +72,9 @@
 
   <div class="info" id="info">启动中…</div>
   <div class="lidar-status" id="lidarStatus">实时贴地中</div>
-  <div class="gesture-hint">单指拖动 · 双指旋转</div>
 
-  <!-- 放大缩小按钮 -->
-  <div class="zoom-controls">
-    <button class="zoom-btn" id="zoomOutBtn">−</button>
-    <button class="zoom-btn" id="zoomInBtn">＋</button>
-  </div>
+  <!-- 手势提示（已移除旋转） -->
+  <div class="gesture-hint">单指拖动 · 双指捏合缩放</div>
 
   <div class="control expanded" id="controlPanel">
     <div class="control-header" id="panelHeader">
@@ -115,8 +99,8 @@
     arjs="sourceType: webcam;" aframe-arkit aframe-arkit-device
     light="ambientIntensity: 1.5;"
   >
-    <!-- 基础 scale 设为 0.3，按钮控制动态缩放 -->
-    <a-entity id="modelGroup" position="0 0.1 -1" scale="0.3 0.3 0.3" ground-tracker gesture-handler zoom-control></a-entity>
+    <!-- 手势组件：仅拖动 + 缩放 -->
+    <a-entity id="modelGroup" position="0 0.1 -1" scale="0.3 0.3 0.3" ground-tracker pinch-zoom-drag></a-entity>
     <a-camera></a-camera>
   </a-scene>
 
@@ -134,12 +118,8 @@
     const panelHeader = document.getElementById('panelHeader');
     const nSlider = document.getElementById('nSlider'), pSlider = document.getElementById('pSlider');
     const nValue = document.getElementById('nValue'), pValue = document.getElementById('pValue');
-    const zoomInBtn = document.getElementById('zoomInBtn');
-    const zoomOutBtn = document.getElementById('zoomOutBtn');
 
     let currentN = 10, currentP = 0.5;
-    let savedRotation = 0;
-    let currentZoom = 1.0;  // 当前缩放倍率
 
     // ========== 面板折叠 ==========
     let clickCount = 0;
@@ -153,21 +133,49 @@
       }
     });
 
-    // ========== 放大缩小组件 ==========
-    AFRAME.registerComponent('zoom-control', {
+    // ========== 手势组件：仅拖动 + 缩放（无旋转）==========
+    AFRAME.registerComponent('pinch-zoom-drag', {
       init: function () {
         const el = this.el;
+        let startX, startZ, startDist, startScale, isDragging = false;
 
-        zoomInBtn.addEventListener('click', () => {
-          currentZoom = Math.min(currentZoom * 1.5, 3.0);
-          el.setAttribute('scale', `${0.3 * currentZoom} ${0.3 * currentZoom} ${0.3 * currentZoom}`);
-          infoEl.innerHTML = `放大 ×${currentZoom.toFixed(1)}`;
+        el.addEventListener('gesturestart', e => {
+          const touches = e.detail.touches;
+          if (touches === 1) {
+            // 单指：拖动
+            const pos = el.object3D.position;
+            startX = pos.x; startZ = pos.z;
+            isDragging = true;
+            document.body.classList.add('ui-dragging');
+          } else if (touches === 2) {
+            // 双指：准备缩放
+            const [t1, t2] = e.detail.touches;
+            startDist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
+            startScale = el.object3D.scale.x;
+          }
         });
 
-        zoomOutBtn.addEventListener('click', () => {
-          currentZoom = Math.max(currentZoom / 1.5, 0.3);
-          el.setAttribute('scale', `${0.3 * currentZoom} ${0.3 * currentZoom} ${0.3 * currentZoom}`);
-          infoEl.innerHTML = `缩小 ×${currentZoom.toFixed(1)}`;
+        el.addEventListener('gesturechange', e => {
+          const touches = e.detail.touches;
+          if (isDragging && touches === 1) {
+            // 单指拖动
+            const delta = e.detail.delta;
+            el.object3D.position.x = startX + delta.x * 0.001;
+            el.object3D.position.z = startZ + delta.z * 0.001;
+          } else if (touches === 2) {
+            // 双指缩放
+            const [t1, t2] = e.detail.touches;
+            const currentDist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
+            const scaleFactor = currentDist / startDist;
+            let newScale = startScale * scaleFactor;
+            newScale = Math.max(0.09, Math.min(newScale, 0.9)); // 0.3× ~ 3.0×
+            el.object3D.scale.set(newScale, newScale, newScale);
+          }
+        });
+
+        el.addEventListener('gestureend', () => {
+          isDragging = false;
+          document.body.classList.remove('ui-dragging');
         });
       }
     });
@@ -190,7 +198,6 @@
     }
 
     function drawChart(n, p) {
-      savedRotation = scene.object3D.rotation.y;
       while (scene.firstChild) scene.removeChild(scene.firstChild);
 
       const data = binomialData(n, p);
@@ -219,8 +226,6 @@
       ground.setAttribute('width', (n + 3) * SPACING); ground.setAttribute('depth', 1.0);
       ground.setAttribute('color', '#333'); ground.setAttribute('opacity', '0.8'); ground.setAttribute('transparent', 'true');
       scene.appendChild(ground);
-
-      scene.object3D.rotation.y = savedRotation;
     }
 
     function updateChart() {
@@ -251,36 +256,11 @@
       }
     });
 
-    // ========== 手势 ==========
-    AFRAME.registerComponent('gesture-handler', {
-      init: function () {
-        let startX, startZ, isDragging = false;
-        this.el.addEventListener('gesturestart', e => {
-          if (e.detail.touches === 1) {
-            const pos = this.el.object3D.position;
-            startX = pos.x; startZ = pos.z; isDragging = true;
-            document.body.classList.add('ui-dragging');
-          }
-        });
-        this.el.addEventListener('gesturechange', e => {
-          if (isDragging && e.detail.touches === 1) {
-            const delta = e.detail.delta;
-            this.el.object3D.position.x = startX + delta.x * 0.001;
-            this.el.object3D.position.z = startZ + delta.z * 0.001;
-          }
-        });
-        this.el.addEventListener('gestureend', () => {
-          isDragging = false;
-          document.body.classList.remove('ui-dragging');
-        });
-      }
-    });
-
     // ========== 初始化 ==========
     window.onload = () => {
       setTimeout(() => {
         drawChart(10, 0.5);
-        infoEl.innerHTML = '就绪！点击 + / - 缩放';
+        infoEl.innerHTML = '就绪！双指缩放，无旋转';
       }, 1500);
     };
   </script>
