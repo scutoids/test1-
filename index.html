@@ -32,7 +32,7 @@
       border-radius: 14px; font-size: 13px; text-align: center; z-index: 200;
       backdrop-filter: blur(16px); box-shadow: 0 4px 12px rgba(0,0,0,0.3);
     }
-    .ground-detected {
+    ._ground-detected {
       position: absolute; top: 106px; left: 50%; transform: translateX(-50%);
       background: linear-gradient(135deg, #34c759, #30d158); color: white;
       padding: 6px 16px; border-radius: 20px; font-size: 12px; font-weight: bold;
@@ -57,7 +57,7 @@
     .toggle-icon { font-size: 22px; transition: transform 0.3s ease; }
     .control.collapsed .toggle-icon { transform: rotate(180deg); }
     .sliders { margin-top: 16px; opacity: 1; transition: all 0.3s ease; }
-    .control.collapsed .sliders { opacity: 0; height: 0; margin: 0; overflow: hidden; pointer-events: none; }
+    .control.collapsed .sliders {奧: 0; height: 0; margin: 0; overflow: hidden; pointer-events: none; }
 
     .slider-container { margin: 18px 0; }
     .slider-label { display: block; margin-bottom: 8px; font-weight: 600; font-size: 14px; color: #fff; }
@@ -96,7 +96,6 @@
   </style>
 </head>
 <body>
-  <!-- 右上角模型切換按鈕 -->
   <div class="status-bar">
     <div class="model-switch-btn" id="modelSwitchBtn">
       <span id="modelText">Poisson</span>
@@ -106,7 +105,6 @@
   <div class="info" id="info">Point camera at floor to start...</div>
   <div class="ground-detected" id="groundStatus">Ground Detected</div>
 
-  <!-- Zoom Buttons: + / − -->
   <div class="zoom-controls">
     <button class="zoom-btn" id="zoomOutBtn">−</button>
     <button class="zoom-btn" id="zoomInBtn">+</button>
@@ -122,7 +120,7 @@
     <div class="sliders" id="sliders"></div>
   </div>
 
-  <!-- A-Frame Scene -->
+  <!-- 模型一出現就喺你面前中間 -->
   <a-scene
     embedded
     vr-mode-ui="enabled: false"
@@ -130,21 +128,19 @@
     arjs="sourceType: webcam; trackingMethod: best; debugUIEnabled: false;"
     device-orientation-permission-ui="enabled: false"
     light="ambientIntensity: 1.5;">
-    <!-- 完全優化位置與大小 -->
-    <a-entity id="modelGroup" position="0 0.1 -0.8" scale="0.5 0.5 0.5"
+    <a-entity id="modelGroup" position="0 0.1 -0.4" scale="1.0 1.0 1.0"
               ground-tracker drag-only zoom-control></a-entity>
     <a-camera></a-camera>
   </a-scene>
 
   <script>
-    // ========== 完全優化參數 ==========
-    const BAR_WIDTH = 0.05;
-    const SPACING = 0.09;     // 更寬鬆
+    // ========== 超大超近參數 ==========
+    const BAR_WIDTH = 0.06;
+    const SPACING = 0.10;
     const FIXED_BASE_Y = 0.15;
-    const MAX_HEIGHT = 1.0;   // 更高柱子
+    const MAX_HEIGHT = 1.2;
 
-    // ========== DOM ==========
-    const scene = document.querySelector('#modelGroup');
+    const scene = document.querySelector('#modelGroup教學');
     const infoEl = document.getElementById('info');
     const groundEl = document.getElementById('groundStatus');
     const switchBtn = document.getElementById('modelSwitchBtn');
@@ -160,14 +156,12 @@
     let zoom = 1.0;
     let lambda = 5.0, n = 10, probP = 0.5;
 
-    // ========== 強制重繪 ==========
     function forceDraw() {
       updateSliders();
       draw();
-      infoEl.textContent = 'Ready! Use + / − to zoom';
+      infoEl.textContent = 'Model in front of you! Use + / − to zoom';
     }
 
-    // ========== Model Switch ==========
     switchBtn.addEventListener('click', () => {
       mode = mode === 'poisson' ? 'binomial' : 'poisson';
       modelText.textContent = mode === 'poisson' ? 'Poisson' : 'Binomial';
@@ -175,7 +169,6 @@
       forceDraw();
     });
 
-    // ========== Dynamic Sliders ==========
     function updateSliders() {
       slidersContainer.innerHTML = '';
       if (mode === 'poisson') {
@@ -212,7 +205,6 @@
       }
     }
 
-    // ========== Math ==========
     const C = (n, k) => {
       if (k < 0 || k > n) return 0;
       let r = 1;
@@ -222,7 +214,6 @@
     const poisson = (k, λ) => Math.pow(λ, k) * Math.exp(-λ) / factorial(k);
     const factorial = n => n <= 1 ? 1 : n * factorial(n - 1);
 
-    // ========== Draw ==========
     function draw() {
       while (scene.firstChild) scene.removeChild(scene.firstChild);
       let data = [], maxP = 0.001, color = '#007aff';
@@ -259,32 +250,62 @@
 
         const txt = document.createElement('a-text');
         txt.setAttribute('value', d.k); txt.setAttribute('position', `${x} ${FIXED_BASE_Y - 0.03} 0`);
-        txt.setAttribute('rotation', '-90 0 0'); txt.setAttribute('scale', '0.25 0.25 0.25'); txt.setAttribute('color', '#fff');
+        txt.setAttribute('rotation', '-90 0 0'); txt.setAttribute('scale', '0.3 0.3 0.3'); txt.setAttribute('color', '#fff');
         scene.appendChild(txt);
       });
 
       const plane = document.createElement('a-plane');
       plane.setAttribute('position', `0 ${FIXED_BASE_Y} 0`); plane.setAttribute('rotation', '-90 0 0');
-      plane.setAttribute('width', Math.max(data.length * SPACING + 1.5, 3)); plane.setAttribute('depth', 1.2);
-      plane.setAttribute('color', '#222'); plane.setAttribute('opacity', '0.75'); plane.setAttribute('transparent', 'true');
+      plane.setAttribute('width', Math.max(data.length * SPACING + 2, 4)); plane.setAttribute('depth', 1.5);
+      plane.setAttribute('color', '#222'); plane.setAttribute('opacity', '0.8'); plane.setAttribute('transparent', 'true');
       scene.appendChild(plane);
     }
 
-    // ========== Components ==========
+    // ========== 關鍵：一偵測地面 → 模型即刻出現你面前中間 ==========
+    AFRAME.registerComponent('ground-tracker', {
+      init: function () { this.hasDrawn = false; },
+      tick: function () {
+        const cam = this.el.sceneEl.camera;
+        if (!cam || this.hasDrawn) return;
+
+        const camPos = new THREE.Vector3();
+        cam.getWorldPosition(camPos);
+        const camDir = new THREE.Vector3();
+        cam.getWorldDirection(camDir);
+        camDir.multiplyScalar(0.4); // 0.4m 前方
+
+        const targetPos = camPos.clone().sub(camDir);
+        targetPos.y = camPos.y - 0.1; // 略低於相
+
+        this.el.object3D.position.copy(targetPos);
+        groundEl.style.display = 'block';
+        infoEl.textContent = 'Model ready in front of you!';
+
+        setTimeout(() => {
+          forceDraw();
+          this.hasDrawn = true;
+        }, 300);
+      }
+    });
+
+    // ========== Zoom 從 1.0 開始（模型已夠大）==========
     AFRAME.registerComponent('zoom-control', {
       init: function () {
         const el = this.el;
         zoomIn.addEventListener('click', () => {
-          zoom = Math.min(zoom * 1.5, 3); el.setAttribute('scale', `${0.5*zoom} ${0.5*zoom} ${0.5*zoom}`);
+          zoom = Math.min(zoom * 1.3, 3);
+          el.setAttribute('scale', `${1.0*zoom} ${1.0*zoom} ${1.0*zoom}`);
           infoEl.textContent = `Zoom: ×${zoom.toFixed(1)}`;
         });
         zoomOut.addEventListener('click', () => {
-          zoom = Math.max(zoom / 1.5, 0.3); el.setAttribute('scale', `${0.5*zoom} ${0.5*zoom} ${0.5*zoom}`);
+          zoom = Math.max(zoom / 1.3, 0.5);
+          el.setAttribute('scale', `${1.0*zoom} ${1.0*zoom} ${1.0*zoom}`);
           infoEl.textContent = `Zoom: ×${zoom.toFixed(1)}`;
         });
       }
     });
 
+    // ========== Drag Only ==========
     AFRAME.registerComponent('drag-only', {
       init: function () {
         const el = this.el;
@@ -302,27 +323,6 @@
           el.object3D.position.z = sz + d.z * 0.001;
         });
         el.addEventListener('gestureend', () => { dragging = false; document.body.classList.remove('ui-dragging'); });
-      }
-    });
-
-    // ========== Ground Tracker (超貼地) ==========
-    AFRAME.registerComponent('ground-tracker', {
-      init: function () { this.hasDrawn = false; },
-      tick: function () {
-        const cam = this.el.sceneEl.camera;
-        if (!cam || this.hasDrawn) return;
-        const ray = new THREE.Raycaster(cam.getWorldPosition(new THREE.Vector3()), new THREE.Vector3(0, -1, 0));
-        const hits = ray.intersectObjects(this.el.sceneEl.object3D.children, true);
-        if (hits[0]) {
-          this.el.object3D.position.y = hits[0].point.y + 0.05;  // 更貼地
-          this.el.object3D.position.z = -0.8;  // 固定更近
-          groundEl.style.display = 'block';
-          infoEl.textContent = 'Loading model...';
-          setTimeout(() => {
-            forceDraw();
-            this.hasDrawn = true;
-          }, 500);
-        }
       }
     });
 
@@ -350,7 +350,7 @@
     window.onload = () => {
       setTimeout(() => {
         forceDraw();
-      }, 2000);
+      }, 1500);
     };
   </script>
 </body>
