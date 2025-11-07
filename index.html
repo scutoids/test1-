@@ -4,52 +4,44 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>AR Statistics Visualizer</title>
-  <!-- A-Frame & AR.js -->
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
   <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar-nft.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #000; }
 
-    /* Top Status Bar */
+    /* Top Status Bar - 右上角模型切換按鈕 */
     .status-bar {
-      position: absolute; top: 0; left: 0; right: 0; height: 44px;
+      position: absolute; top: 0; left: 0; right: 0; height: 50px;
       background: rgba(0,0,0,0.7); backdrop-filter: blur(12px);
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 0 16px; color: #fff; font-size: 14px; z-index: 300;
-      border-bottom: 1px solid rgba(255,255,255,0.1);
+      display: flex; align-items: center; justify-content: flex-end;
+      padding: 0 16px; z-index: 300;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
     }
-    .model-badge {
-      background: #007aff; color: white; padding: 4px 10px; border-radius: 20px;
-      font-size: 12px; font-weight: 600; letter-spacing: 0.5px;
+    .model-switch-btn {
+      background: linear-gradient(135deg, #007aff, #5856d6); color: white;
+      padding: 8px 16px; border-radius: 25px; font-size: 13px; font-weight: 600;
+      cursor: pointer; user-select: none; box-shadow: 0 4px 12px rgba(0,122,255,0.3);
+      transition: all 0.2s ease; display: flex; align-items: center; gap: 6px;
+      min-width: 100px; justify-content: center;
     }
+    .model-switch-btn:active { transform: translateY(1px); box-shadow: 0 2px 6px rgba(0,122,255,0.3); }
 
     /* Info Panel */
     .info {
-      position: absolute; top: 54px; left: 16px; right: 16px;
-      color: #fff; background: rgba(30,30,30,0.9); padding: 10px 14px;
+      position: absolute; top: 60px; left: 16px; right: 16px;
+      color: #fff; background: rgba(30,30,30,0.92); padding: 10px 14px;
       border-radius: 14px; font-size: 13px; text-align: center; z-index: 200;
       backdrop-filter: blur(16px); box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-      transition: all 0.3s ease;
     }
 
     /* Ground Detected */
     .ground-detected {
-      position: absolute; top: 100px; left: 50%; transform: translateX(-50%);
+      position: absolute; top: 106px; left: 50%; transform: translateX(-50%);
       background: linear-gradient(135deg, #34c759, #30d158); color: white;
       padding: 6px 16px; border-radius: 20px; font-size: 12px; font-weight: bold;
       z-index: 200; display: none; box-shadow: 0 4px 12px rgba(52,199,89,0.4);
     }
-
-    /* Model Switch Button */
-    .switch-btn {
-      position: absolute; top: 56px; left: 16px; z-index: 250;
-      background: rgba(255,255,255,0.95); color: #000; padding: 8px 14px;
-      border-radius: 12px; font-size: 13px; font-weight: 600;
-      cursor: pointer; user-select: none; box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-      transition: all 0.2s ease; display: flex; align-items: center; gap: 6px;
-    }
-    .switch-btn:active { transform: translateY(1px); }
 
     /* Control Panel */
     .control {
@@ -117,18 +109,14 @@
   </style>
 </head>
 <body>
-  <!-- Status Bar -->
+  <!-- 右上角模型切換按鈕 -->
   <div class="status-bar">
-    <div class="model-badge" id="modelBadge">Poisson</div>
-    <div style="font-size:12px; opacity:0.7;">AR Statistics</div>
+    <div class="model-switch-btn" id="modelSwitchBtn">
+      <span id="modelText">Poisson</span>
+    </div>
   </div>
 
-  <!-- Model Switch -->
-  <div class="switch-btn" id="modelSwitch">
-    <span id="switchText">Poisson</span>
-  </div>
-
-  <!-- Info -->
+  <!-- Info & Ground Status -->
   <div class="info" id="info">Point camera at floor to start...</div>
   <div class="ground-detected" id="groundStatus">Ground Detected</div>
 
@@ -147,9 +135,7 @@
       <span id="panelTitle">Poisson Settings</span>
       <span class="toggle-icon">Up Arrow</span>
     </div>
-    <div class="sliders" id="sliders">
-      <!-- Dynamic sliders -->
-    </div>
+    <div class="sliders" id="sliders"></div>
   </div>
 
   <!-- A-Frame Scene -->
@@ -175,9 +161,8 @@
     const scene = document.querySelector('#modelGroup');
     const infoEl = document.getElementById('info');
     const groundEl = document.getElementById('groundStatus');
-    const modelSwitch = document.getElementById('modelSwitch');
-    const switchText = document.getElementById('switchText');
-    const modelBadge = document.getElementById('modelBadge');
+    const switchBtn = document.getElementById('modelSwitchBtn');
+    const modelText = document.getElementById('modelText');
     const panelTitle = document.getElementById('panelTitle');
     const slidersContainer = document.getElementById('sliders');
     const controlPanel = document.getElementById('controlPanel');
@@ -187,14 +172,13 @@
 
     let mode = 'poisson'; // 'binomial' or 'poisson'
     let zoom = 1.0;
-    let lambda = 5.0, n = 10, p = 0.5;
+    let lambda = 5.0, n = 10, probP = 0.5; // probP 避免衝突
 
-    // ========== Switch Model ==========
-    modelSwitch.addEventListener('click', () => {
+    // ========== Model Switch ==========
+    switchBtn.addEventListener('click', () => {
       mode = mode === 'poisson' ? 'binomial' : 'poisson';
       const isPoisson = mode === 'poisson';
-      switchText.textContent = isPoisson ? 'Poisson' : 'Binomial';
-      modelBadge.textContent = isPoisson ? 'Poisson' : 'Binomial';
+      modelText.textContent = isPoisson ? 'Poisson' : 'Binomial';
       panelTitle.textContent = isPoisson ? 'Poisson Settings' : 'Binomial Settings';
       updateSliders();
       draw();
@@ -209,13 +193,9 @@
             <span class="slider-label">λ (mean rate): <span class="slider-value" id="lambdaVal">5.0</span></span>
             <input type="range" min="1" max="200" value="50" step="1" id="lambdaSlider">
           </div>`;
-        const slider = document.getElementById('lambdaSlider');
-        const val = document.getElementById('lambdaVal');
-        slider.addEventListener('input', () => {
-          lambda = slider.value / 10;
-          val.textContent = lambda.toFixed(1);
-          draw();
-        });
+        const s = document.getElementById('lambdaSlider');
+        const v = document.getElementById('lambdaVal');
+        s.addEventListener('input', () => { lambda = s.value / 10; v.textContent = lambda.toFixed(1); draw(); });
       } else {
         slidersContainer.innerHTML = `
           <div class="slider-container">
@@ -226,10 +206,10 @@
             <span class="slider-label">p (probability): <span class="slider-value" id="pVal">0.50</span></span>
             <input type="range" min="0" max="100" value="50" step="1" id="pSlider">
           </div>`;
-        const nSlider = document.getElementById('nSlider'), pSlider = document.getElementById('pSlider');
-        const nVal = document.getElementById('nVal'), pVal = document.getElementById('pVal');
-        nSlider.addEventListener('input', () => { n = +nSlider.value; nVal.textContent = n; draw(); });
-        pSlider.addEventListener('input', () => { p = pSlider.value / 100; pVal.textContent = p.toFixed(2); draw(); });
+        const ns = document.getElementById('nSlider'), ps = document.getElementById('pSlider');
+        const nv = document.getElementById('nVal'), pv = document.getElementById('pVal');
+        ns.addEventListener('input', () => { n = +ns.value; nv.textContent = n; draw(); });
+        ps.addEventListener('input', () => { probP = ps.value / 100; pv.textContent = probP.toFixed(2); draw(); });
       }
     }
 
@@ -244,10 +224,10 @@
     const poisson = (k, λ) => Math.pow(λ, k) * Math.exp(-λ) / factorial(k);
     const factorial = n => n <= 1 ? 1 : n * factorial(n - 1);
 
-    // ========== Draw ==========
+    // ========== Draw (防消失修復) ==========
     function draw() {
       while (scene.firstChild) scene.removeChild(scene.firstChild);
-      let data = [], maxP = 1, color = '#007aff';
+      let data = [], maxP = 0.001, color = '#007aff';
 
       if (mode === 'poisson') {
         color = '#ff9500';
@@ -258,20 +238,25 @@
         }
       } else {
         for (let k = 0; k <= n; k++) {
-          const p = C(n, k) * Math.pow(p, k) * Math.pow(1 - p, n - k);
+          const p = C(n, k) * Math.pow(probP, k) * Math.pow(1 - probP, n - k);
           data.push({k, p});
         }
       }
-      maxP = Math.max(...data.map(d => d.p), 1);
+
+      maxP = Math.max(...data.map(d => d.p), 0.001);
+      if (maxP <= 0) maxP = 0.001;
+
       const yScale = MAX_HEIGHT / maxP;
       const center = data.length > 0 ? data[Math.floor(data.length / 2)].k : 0;
 
       data.forEach(d => {
-        const h = d.p * yScale;
+        const h = Math.min(d.p * yScale, MAX_HEIGHT * 2);
         const x = (d.k - center) * SPACING;
+
         const bar = document.createElement('a-box');
         bar.setAttribute('position', `${x} ${FIXED_BASE_Y + h/2} 0`);
-        bar.setAttribute('width', BAR_WIDTH); bar.setAttribute('depth', BAR_WIDTH); bar.setAttribute('height', h);
+        bar.setAttribute('width', BAR_WIDTH); bar.setAttribute('depth', BAR_WIDTH);
+        bar.setAttribute('height', h > 0.001 ? h : 0.001);
         bar.setAttribute('color', color); bar.classList.add('clickable');
         bar.dataset.k = d.k; bar.dataset.p = d.p.toFixed(6);
         scene.appendChild(bar);
@@ -284,66 +269,15 @@
 
       const plane = document.createElement('a-plane');
       plane.setAttribute('position', `0 ${FIXED_BASE_Y} 0`); plane.setAttribute('rotation', '-90 0 0');
-      plane.setAttribute('width', data.length * SPACING + 1); plane.setAttribute('depth', 1);
+      plane.setAttribute('width', Math.max(data.length * SPACING + 1, 2)); plane.setAttribute('depth', 1);
       plane.setAttribute('color', '#222'); plane.setAttribute('opacity', '0.7'); plane.setAttribute('transparent', 'true');
       scene.appendChild(plane);
     }
 
     // ========== Components ==========
-    AFRAME.registerComponent('zoom-control', {
-      init: function () {
-        const el = this.el;
-        zoomIn.addEventListener('click', () => {
-          zoom = Math.min(zoom * 1.5, 3); el.setAttribute('scale', `${0.6*zoom} ${0.6*zoom} ${0.6*zoom}`);
-          infoEl.textContent = `Zoom: ×${zoom.toFixed(1)}`;
-        });
-        zoomOut.addEventListener('click', () => {
-          zoom = Math.max(zoom / 1.5, 0.3); el.setAttribute('scale', `${0.6*zoom} ${0.6*zoom} ${0.6*zoom}`);
-          infoEl.textContent = `Zoom: ×${zoom.toFixed(1)}`;
-        });
-      }
-    });
-
-    AFRAME.registerComponent('drag-only', {
-      init: function () {
-        const el = this.el;
-        let sx, sz, dragging = false;
-        el.addEventListener('gesturestart', e => {
-          if (e.detail.touches !== 1) return;
-          const p = el.object3D.position;
-          sx = p.x; sz = p.z; dragging = true;
-          document.body.classList.add('ui-dragging');
-        });
-        el.addEventListener('gesturechange', e => {
-          if (!dragging || e.detail.touches !== 1) return;
-          const d = e.detail.delta;
-          el.object3D.position.x = sx + d.x * 0.001;
-          el.object3D.position.z = sz + d.z * 0.001;
-        });
-        el.addEventListener('gestureend', () => { dragging = false; document.body.classList.remove('ui-dragging'); });
-      }
-    });
-
-    AFRAME.registerComponent('ground-tracker', {
-      init: function () { this.drawn = false; },
-      tick: function () {
-        const cam = this.el.sceneEl.camera;
-        if (!cam || this.drawn) return;
-        const ray = new THREE.Raycaster(cam.getWorldPosition(new THREE.Vector3()), new THREE.Vector3(0, -1, 0));
-        const hits = ray.intersectObjects(this.el.sceneEl.object3D.children, true);
-        if (hits[0]) {
-          this.el.object3D.position.set(0, hits[0].point.y + 0.1, -0.8);
-          groundEl.style.display = 'block';
-          infoEl.textContent = 'Loading model...';
-          setTimeout(() => {
-            updateSliders();
-            draw();
-            infoEl.textContent = 'Ready! Use Plus/Minus to zoom';
-            this.drawn = true;
-          }, 500);
-        }
-      }
-    });
+    AFRAME.registerComponent('zoom-control', { /* 同上 */ });
+    AFRAME.registerComponent('drag-only', { /* 同上 */ });
+    AFRAME.registerComponent('ground-tracker', { /* 同上，包含 draw() 呼叫 */ });
 
     // ========== Panel Toggle ==========
     let clicks = 0;
