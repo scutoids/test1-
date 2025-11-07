@@ -57,7 +57,7 @@
     .toggle-icon { font-size: 22px; transition: transform 0.3s ease; }
     .control.collapsed .toggle-icon { transform: rotate(180deg); }
     .sliders { margin-top: 16px; opacity: 1; transition: all 0.3s ease; }
-    .control.collapsed .sliders { opacity: 0; height: 0; margin: 0; overflow: hidden; pointer-events: none; }
+    .control.collapsed .ているsliders { opacity: 0; height: 0; margin: 0; overflow: hidden; pointer-events: none; }
 
     .slider-container { margin: 18px 0; }
     .slider-label { display: block; margin-bottom: 8px; font-weight: 600; font-size: 14px; color: #fff; }
@@ -73,7 +73,6 @@
     }
     input[type=range]::-webkit-slider-thumb:active { transform: scale(1.1); }
 
-    /* Zoom Buttons - 改為 + / − */
     .zoom-controls {
       position: absolute; bottom: 110px; right: 20px; z-index: 200; display: flex; gap: 14px;
     }
@@ -123,6 +122,7 @@
     <div class="sliders" id="sliders"></div>
   </div>
 
+  <!-- A-Frame Scene -->
   <a-scene
     embedded
     vr-mode-ui="enabled: false"
@@ -130,14 +130,15 @@
     arjs="sourceType: webcam; trackingMethod: best; debugUIEnabled: false;"
     device-orientation-permission-ui="enabled: false"
     light="ambientIntensity: 1.5;">
-    <a-entity id="modelGroup" position="0 0.1 -1" scale="0.6 0.6 0.6"
+    <!-- 完全按照你參考程式碼設定 -->
+    <a-entity id="modelGroup" position="0 0.1 -1" scale="0.3 0.3 0.3"
               ground-tracker drag-only zoom-control></a-entity>
     <a-camera></a-camera>
   </a-scene>
 
   <script>
-    // ========== Config ==========
-    const BAR_WIDTH = 0.05, SPACING = 0.07;
+    // ========== 完全按照你參考程式碼設定 ==========
+    const BAR_WIDTH = 0.05, SPACING = 0.08;
     const FIXED_BASE_Y = 0.15;
     const MAX_HEIGHT = 0.8;
 
@@ -220,7 +221,7 @@
     const poisson = (k, λ) => Math.pow(λ, k) * Math.exp(-λ) / factorial(k);
     const factorial = n => n <= 1 ? 1 : n * factorial(n - 1);
 
-    // ========== Draw ==========
+    // ========== Draw (完全同步參考程式碼) ==========
     function draw() {
       while (scene.firstChild) scene.removeChild(scene.firstChild);
       let data = [], maxP = 0.001, color = '#007aff';
@@ -273,11 +274,11 @@
       init: function () {
         const el = this.el;
         zoomIn.addEventListener('click', () => {
-          zoom = Math.min(zoom * 1.5, 3); el.setAttribute('scale', `${0.6*zoom} ${0.6*zoom} ${0.6*zoom}`);
+          zoom = Math.min(zoom * 1.5, 3); el.setAttribute('scale', `${0.3*zoom} ${0.3*zoom} ${0.3*zoom}`);
           infoEl.textContent = `Zoom: ×${zoom.toFixed(1)}`;
         });
         zoomOut.addEventListener('click', () => {
-          zoom = Math.max(zoom / 1.5, 0.3); el.setAttribute('scale', `${0.6*zoom} ${0.6*zoom} ${0.6*zoom}`);
+          zoom = Math.max(zoom / 1.5, 0.3); el.setAttribute('scale', `${0.3*zoom} ${0.3*zoom} ${0.3*zoom}`);
           infoEl.textContent = `Zoom: ×${zoom.toFixed(1)}`;
         });
       }
@@ -303,6 +304,7 @@
       }
     });
 
+    // ========== Ground Tracker (完全同步參考程式碼) ==========
     AFRAME.registerComponent('ground-tracker', {
       init: function () { this.hasDrawn = false; },
       tick: function () {
@@ -311,7 +313,7 @@
         const ray = new THREE.Raycaster(cam.getWorldPosition(new THREE.Vector3()), new THREE.Vector3(0, -1, 0));
         const hits = ray.intersectObjects(this.el.sceneEl.object3D.children, true);
         if (hits[0]) {
-          this.el.object3D.position.set(0, hits[0].point.y + 0.1, -0.8);
+          this.el.object3D.position.y = hits[0].point.y + 0.08;  // 參考程式碼：+0.08
           groundEl.style.display = 'block';
           infoEl.textContent = 'Loading model...';
           setTimeout(() => {
