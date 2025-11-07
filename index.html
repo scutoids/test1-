@@ -57,7 +57,7 @@
     .toggle-icon { font-size: 22px; transition: transform 0.3s ease; }
     .control.collapsed .toggle-icon { transform: rotate(180deg); }
     .sliders { margin-top: 16px; opacity: 1; transition: all 0.3s ease; }
-    .control.collapsed .ているsliders { opacity: 0; height: 0; margin: 0; overflow: hidden; pointer-events: none; }
+    .control.collapsed .sliders { opacity: 0; height: 0; margin: 0; overflow: hidden; pointer-events: none; }
 
     .slider-container { margin: 18px 0; }
     .slider-label { display: block; margin-bottom: 8px; font-weight: 600; font-size: 14px; color: #fff; }
@@ -130,17 +130,18 @@
     arjs="sourceType: webcam; trackingMethod: best; debugUIEnabled: false;"
     device-orientation-permission-ui="enabled: false"
     light="ambientIntensity: 1.5;">
-    <!-- 完全按照你參考程式碼設定 -->
-    <a-entity id="modelGroup" position="0 0.1 -1" scale="0.3 0.3 0.3"
+    <!-- 完全優化位置與大小 -->
+    <a-entity id="modelGroup" position="0 0.1 -0.8" scale="0.5 0.5 0.5"
               ground-tracker drag-only zoom-control></a-entity>
     <a-camera></a-camera>
   </a-scene>
 
   <script>
-    // ========== 完全按照你參考程式碼設定 ==========
-    const BAR_WIDTH = 0.05, SPACING = 0.08;
+    // ========== 完全優化參數 ==========
+    const BAR_WIDTH = 0.05;
+    const SPACING = 0.09;     // 更寬鬆
     const FIXED_BASE_Y = 0.15;
-    const MAX_HEIGHT = 0.8;
+    const MAX_HEIGHT = 1.0;   // 更高柱子
 
     // ========== DOM ==========
     const scene = document.querySelector('#modelGroup');
@@ -221,7 +222,7 @@
     const poisson = (k, λ) => Math.pow(λ, k) * Math.exp(-λ) / factorial(k);
     const factorial = n => n <= 1 ? 1 : n * factorial(n - 1);
 
-    // ========== Draw (完全同步參考程式碼) ==========
+    // ========== Draw ==========
     function draw() {
       while (scene.firstChild) scene.removeChild(scene.firstChild);
       let data = [], maxP = 0.001, color = '#007aff';
@@ -258,14 +259,14 @@
 
         const txt = document.createElement('a-text');
         txt.setAttribute('value', d.k); txt.setAttribute('position', `${x} ${FIXED_BASE_Y - 0.03} 0`);
-        txt.setAttribute('rotation', '-90 0 0'); txt.setAttribute('scale', '0.2 0.2 0.2'); txt.setAttribute('color', '#fff');
+        txt.setAttribute('rotation', '-90 0 0'); txt.setAttribute('scale', '0.25 0.25 0.25'); txt.setAttribute('color', '#fff');
         scene.appendChild(txt);
       });
 
       const plane = document.createElement('a-plane');
       plane.setAttribute('position', `0 ${FIXED_BASE_Y} 0`); plane.setAttribute('rotation', '-90 0 0');
-      plane.setAttribute('width', Math.max(data.length * SPACING + 1, 2)); plane.setAttribute('depth', 1);
-      plane.setAttribute('color', '#222'); plane.setAttribute('opacity', '0.7'); plane.setAttribute('transparent', 'true');
+      plane.setAttribute('width', Math.max(data.length * SPACING + 1.5, 3)); plane.setAttribute('depth', 1.2);
+      plane.setAttribute('color', '#222'); plane.setAttribute('opacity', '0.75'); plane.setAttribute('transparent', 'true');
       scene.appendChild(plane);
     }
 
@@ -274,11 +275,11 @@
       init: function () {
         const el = this.el;
         zoomIn.addEventListener('click', () => {
-          zoom = Math.min(zoom * 1.5, 3); el.setAttribute('scale', `${0.3*zoom} ${0.3*zoom} ${0.3*zoom}`);
+          zoom = Math.min(zoom * 1.5, 3); el.setAttribute('scale', `${0.5*zoom} ${0.5*zoom} ${0.5*zoom}`);
           infoEl.textContent = `Zoom: ×${zoom.toFixed(1)}`;
         });
         zoomOut.addEventListener('click', () => {
-          zoom = Math.max(zoom / 1.5, 0.3); el.setAttribute('scale', `${0.3*zoom} ${0.3*zoom} ${0.3*zoom}`);
+          zoom = Math.max(zoom / 1.5, 0.3); el.setAttribute('scale', `${0.5*zoom} ${0.5*zoom} ${0.5*zoom}`);
           infoEl.textContent = `Zoom: ×${zoom.toFixed(1)}`;
         });
       }
@@ -304,7 +305,7 @@
       }
     });
 
-    // ========== Ground Tracker (完全同步參考程式碼) ==========
+    // ========== Ground Tracker (超貼地) ==========
     AFRAME.registerComponent('ground-tracker', {
       init: function () { this.hasDrawn = false; },
       tick: function () {
@@ -313,7 +314,8 @@
         const ray = new THREE.Raycaster(cam.getWorldPosition(new THREE.Vector3()), new THREE.Vector3(0, -1, 0));
         const hits = ray.intersectObjects(this.el.sceneEl.object3D.children, true);
         if (hits[0]) {
-          this.el.object3D.position.y = hits[0].point.y + 0.08;  // 參考程式碼：+0.08
+          this.el.object3D.position.y = hits[0].point.y + 0.05;  // 更貼地
+          this.el.object3D.position.z = -0.8;  // 固定更近
           groundEl.style.display = 'block';
           infoEl.textContent = 'Loading model...';
           setTimeout(() => {
