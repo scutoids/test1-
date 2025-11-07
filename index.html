@@ -3,32 +3,34 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>AR Binomial Distribution</title>
-
+  <title>AR Binomial ↔ Poisson Distribution</title>
   <!-- A-Frame & AR.js -->
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
   <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar-nft.js"></script>
   <script src="https://cdn.jsdelivr.net/gh/AR-js-org/aframe-arkit@master/dist/aframe-arkit.min.js"></script>
-
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: #000; }
-
     /* Top Info */
     .info {
-      position: absolute; top: 15px; left: 15px; right: 15px;
+      position: absolute; top: 15px; left: 160px; right: 15px;
       color: #fff; background: rgba(0,0,0,0.85); padding: 10px 14px;
       border-radius: 12px; font-size: 14px; text-align: center; z-index: 100;
       backdrop-filter: blur(6px);
     }
-
+    /* Mode Button (top-left) */
+    .mode-btn {
+      position: absolute; top: 15px; left: 15px; z-index: 101;
+      background: rgba(0,0,0,0.85); color: #fff; padding: 10px 14px;
+      border-radius: 12px; font-size: 14px; text-align: center;
+      backdrop-filter: blur(6px); border: none; cursor: pointer;
+    }
     /* LiDAR Status */
     .lidar-status {
       position: absolute; top: 70px; left: 50%; transform: translateX(-50%);
       background: #34c759; color: white; padding: 6px 16px; border-radius: 20px;
       font-size: 13px; font-weight: bold; z-index: 100; display: none;
     }
-
     /* Control Panel */
     .control {
       position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%);
@@ -39,21 +41,17 @@
     }
     .control.collapsed { height: 56px; padding: 0 16px; }
     .control.expanded { padding: 20px 16px 24px; }
-
     .control-header {
       display: flex; justify-content: space-between; align-items: center;
       height: 56px; cursor: pointer; user-select: none; font-weight: 600; font-size: 15px; color: #fff;
     }
     .toggle-icon { font-size: 20px; transition: transform 0.3s; }
     .control.collapsed .toggle-icon { transform: rotate(180deg); }
-
     .sliders { margin-top: 16px; opacity: 1; transition: opacity 0.3s; }
     .control.collapsed .sliders { opacity: 0; height: 0; margin: 0; overflow: hidden; pointer-events: none; }
-
     .slider-container { margin: 16px 0; }
     .slider-label { display: block; margin-bottom: 8px; font-weight: 600; font-size: 14px; color: #fff; }
     .slider-value { display: inline-block; width: 60px; color: #4a90e2; font-weight: bold; }
-
     input[type="range"] {
       -webkit-appearance: none !important; width: 100%; height: 8px; border-radius: 5px;
       background: #444 !important; outline: none; margin: 12px 0;
@@ -62,7 +60,6 @@
       -webkit-appearance: none !important; width: 24px; height: 24px; border-radius: 50%;
       background: #007aff !important; box-shadow: 0 2px 6px rgba(0,0,0,0.4); margin-top: -8px;
     }
-
     /* Zoom Buttons */
     .zoom-controls {
       position: absolute; bottom: 100px; right: 20px; z-index: 100; display: flex; gap: 12px;
@@ -74,31 +71,26 @@
       display: flex; align-items: center; justify-content: center;
     }
     .zoom-btn:active { transform: scale(0.9); }
-
     /* Gesture Hint */
     .gesture-hint {
       position: absolute; bottom: 100px; left: 50%; transform: translateX(-50%);
       background: rgba(0,0,0,0.8); color: #fff; padding: 8px 16px;
       border-radius: 20px; font-size: 13px; z-index: 100;
     }
-
     .ui-dragging * { opacity: 0.3 !important; }
   </style>
 </head>
 <body>
-
   <div class="info" id="info">Initializing...</div>
+  <button id="modeBtn" class="mode-btn">Switch to Poisson</button>
   <div class="lidar-status" id="lidarStatus">Ground Detected</div>
-
   <!-- Zoom Buttons -->
   <div class="zoom-controls">
     <button class="zoom-btn" id="zoomOutBtn">−</button>
     <button class="zoom-btn" id="zoomInBtn">＋</button>
   </div>
-
   <!-- Gesture Hint -->
   <div class="gesture-hint">Drag with one finger to move</div>
-
   <!-- Control Panel -->
   <div class="control expanded" id="controlPanel">
     <div class="control-header" id="panelHeader">
@@ -112,12 +104,10 @@
       </div>
       <div class="slider-container">
         <span class="slider-label">p (probability): <span class="slider-value" id="pValue">0.50</span></span>
-        <input type="range" min="0" max="100" value="50" step...
-        ="1" id="pSlider">
+        <input type="range" min="0" max="1" value="0.5" step="0.01" id="pSlider">
       </div>
     </div>
   </div>
-
   <!-- A-Frame Scene -->
   <a-scene
     embedded vr-mode-ui="enabled: false"
@@ -128,13 +118,11 @@
     <a-entity id="modelGroup" position="0 0.1 -1" scale="0.3 0.3 0.3" ground-tracker drag-only zoom-control></a-entity>
     <a-camera></a-camera>
   </a-scene>
-
   <script>
     // ========== Configuration ==========
     const BAR_WIDTH = 0.05, SPACING = 0.08;
     const FIXED_BASE_Y = 0.15;
     const MAX_HEIGHT = 0.8;
-
     // ========== DOM Elements ==========
     const scene = document.querySelector('#modelGroup');
     const infoEl = document.getElementById('info');
@@ -145,10 +133,18 @@
     const nValue = document.getElementById('nValue'), pValue = document.getElementById('pValue');
     const zoomInBtn = document.getElementById('zoomInBtn');
     const zoomOutBtn = document.getElementById('zoomOutBtn');
-
-    let currentN = 10, currentP = 0.5;
+    const modeBtn = document.getElementById('modeBtn');
+    const nContainer = document.querySelectorAll('.slider-container')[0];
+    const pContainer = document.querySelectorAll('.slider-container')[1];
+    const pLabel = pContainer.querySelector('.slider-label');
+    let currentMode = 'binomial';
+    let currentN = 10;
+    let currentP = 0.50;
+    let currentLambda = 5.0;
+    let lastN = 10;
+    let lastP = 0.50;
+    let lastLambda = 5.0;
     let currentZoom = 1.0;
-
     // ========== Panel Toggle ==========
     let clickCount = 0;
     panelHeader.addEventListener('click', () => {
@@ -164,18 +160,15 @@
         clickCount = 0;
       }
     });
-
     // ========== Zoom Control Component ==========
     AFRAME.registerComponent('zoom-control', {
       init: function () {
         const el = this.el;
-
         zoomInBtn.addEventListener('click', () => {
           currentZoom = Math.min(currentZoom * 1.5, 3.0);
           el.setAttribute('scale', `${0.3 * currentZoom} ${0.3 * currentZoom} ${0.3 * currentZoom}`);
           infoEl.innerHTML = `Zoom: ×${currentZoom.toFixed(1)}`;
         });
-
         zoomOutBtn.addEventListener('click', () => {
           currentZoom = Math.max(currentZoom / 1.5, 0.3);
           el.setAttribute('scale', `${0.3 * currentZoom} ${0.3 * currentZoom} ${0.3 * currentZoom}`);
@@ -183,13 +176,11 @@
         });
       }
     });
-
-    // ========== Drag Only (No Rotation, No Pinch) ==========
+    // ========== Drag Only ==========
     AFRAME.registerComponent('drag-only', {
       init: function () {
         const el = this.el;
         let startX, startZ, isDragging = false;
-
         el.addEventListener('gesturestart', e => {
           if (e.detail.touches === 1) {
             const pos = el.object3D.position;
@@ -198,7 +189,6 @@
             document.body.classList.add('ui-dragging');
           }
         });
-
         el.addEventListener('gesturechange', e => {
           if (isDragging && e.detail.touches === 1) {
             const delta = e.detail.delta;
@@ -206,22 +196,19 @@
             el.object3D.position.z = startZ + delta.z * 0.001;
           }
         });
-
         el.addEventListener('gestureend', () => {
           isDragging = false;
           document.body.classList.remove('ui-dragging');
         });
       }
     });
-
-    // ========== Math & Chart ==========
+    // ========== Math Functions ==========
     function C(n, k) {
       if (k < 0 || k > n) return 0;
       let res = 1;
       for (let i = 1; i <= k; ++i) res = res * (n - i + 1) / i;
       return Math.round(res * 100000) / 100000;
     }
-
     function binomialData(n, p) {
       const data = [];
       for (let k = 0; k <= n; ++k) {
@@ -230,52 +217,129 @@
       }
       return data;
     }
-
-    function drawChart(n, p) {
+    function poissonData(lambda) {
+      if (lambda <= 0) return [{k: 0, pk: 1}];
+      const data = [];
+      let pk = Math.exp(-lambda);
+      let cumProb = pk;
+      data.push({k: 0, pk});
+      let k = 1;
+      while (cumProb < 0.999 || pk > 1e-5) {
+        pk = pk * lambda / k;
+        data.push({k, pk});
+        cumProb += pk;
+        k++;
+        if (k > lambda + 50) break;
+      }
+      return data;
+    }
+    // ========== Draw Chart ==========
+    function drawChart() {
       while (scene.firstChild) scene.removeChild(scene.firstChild);
-
-      const data = binomialData(n, p);
-      const maxProb = Math.max(...data.map(d => d.pk)) || 1;
+      let data, mean;
+      if (currentMode === 'binomial') {
+        data = binomialData(currentN, currentP);
+        mean = currentN * currentP;
+      } else {
+        data = poissonData(currentLambda);
+        mean = currentLambda;
+      }
+      const maxProb = data.reduce((m, d) => Math.max(m, d.pk), 0) || 1;
       const scaleY = MAX_HEIGHT / maxProb;
-
       data.forEach(d => {
-        const height = d.pk * scaleY;
-        const xPos = (d.k - n / 2) * SPACING;
-
+        if (d.pk < 1e-8) return; // skip invisible bars
+        const height = Math.max(d.pk * scaleY, 0.001);
+        const xPos = (d.k - mean) * SPACING;
         const bar = document.createElement('a-box');
         bar.setAttribute('position', `${xPos} ${FIXED_BASE_Y + height / 2} 0`);
         bar.setAttribute('width', BAR_WIDTH); bar.setAttribute('depth', BAR_WIDTH); bar.setAttribute('height', height);
         bar.setAttribute('color', '#4a90e2'); bar.setAttribute('class', 'clickable');
-        bar.setAttribute('data-k', d.k); bar.setAttribute('data-pk', d.pk.toFixed(4));
+        bar.setAttribute('data-k', d.k); bar.setAttribute('data-pk', d.pk.toFixed(6));
         scene.appendChild(bar);
-
         const label = document.createElement('a-text');
-        label.setAttribute('value', d.k); label.setAttribute('position', `${xPos} ${FIXED_BASE_Y - 0.03} 0`);
-        label.setAttribute('rotation', '-90 0 0'); label.setAttribute('scale', '0.2 0.2 0.2'); label.setAttribute('color', '#fff');
+        label.setAttribute('value', d.k);
+        label.setAttribute('position', `${xPos} ${FIXED_BASE_Y - 0.03} 0`);
+        label.setAttribute('rotation', '-90 0 0');
+        label.setAttribute('scale', '0.2 0.2 0.2');
+        label.setAttribute('color', '#fff');
+        label.setAttribute('align', 'center');
         scene.appendChild(label);
       });
-
+      // Ground plane (auto-sized & centered)
+      const xPositions = data.map(d => (d.k - mean) * SPACING);
+      const minX = Math.min(...xPositions) - SPACING;
+      const maxX = Math.max(...xPositions) + SPACING;
+      const groundWidth = maxX - minX;
       const ground = document.createElement('a-plane');
-      ground.setAttribute('position', `0 ${FIXED_BASE_Y} 0`); ground.setAttribute('rotation', '-90 0 0');
-      ground.setAttribute('width', (n + 3) * SPACING); ground.setAttribute('depth', 1.0);
-      ground.setAttribute('color', '#333'); ground.setAttribute('opacity', '0.8'); ground.setAttribute('transparent', 'true');
+      ground.setAttribute('position', `${(minX + maxX) / 2} ${FIXED_BASE_Y} 0`);
+      ground.setAttribute('rotation', '-90 0 0');
+      ground.setAttribute('width', groundWidth);
+      ground.setAttribute('depth', 1.2);
+      ground.setAttribute('color', '#333');
+      ground.setAttribute('opacity', '0.8');
+      ground.setAttribute('transparent', 'true');
       scene.appendChild(ground);
     }
-
     function updateChart() {
-      drawChart(currentN, currentP);
+      drawChart();
     }
-
-    nSlider.addEventListener('input', () => { currentN = +nSlider.value; nValue.textContent = currentN; updateChart(); });
-    pSlider.addEventListener('input', () => { currentP = pSlider.value / 100; pValue.textContent = currentP.toFixed(2); updateChart(); });
-
+    // ========== Sliders ==========
+    nSlider.addEventListener('input', () => {
+      currentN = +nSlider.value;
+      nValue.textContent = currentN;
+      updateChart();
+    });
+    pSlider.addEventListener('input', () => {
+      const val = parseFloat(pSlider.value);
+      if (currentMode === 'binomial') {
+        currentP = val;
+      } else {
+        currentLambda = val;
+      }
+      pValue.textContent = val.toFixed(2);
+      updateChart();
+    });
+    // ========== Mode Switch (top-left button) ==========
+    modeBtn.addEventListener('click', () => {
+      if (currentMode === 'binomial') {
+        // Save binomial → switch to Poisson
+        lastN = currentN;
+        lastP = currentP;
+        currentMode = 'poisson';
+        modeBtn.textContent = 'Switch to Binomial';
+        nContainer.style.display = 'none';
+        pSlider.min = '0.1';
+        pSlider.max = '30';
+        pSlider.step = '0.1';
+        pSlider.value = lastLambda;
+        pLabel.innerHTML = `λ (mean): <span class="slider-value" id="pValue">${lastLambda.toFixed(2)}</span>`;
+        currentLambda = lastLambda;
+      } else {
+        // Save Poisson → switch to Binomial
+        lastLambda = currentLambda;
+        currentMode = 'binomial';
+        modeBtn.textContent = 'Switch to Poisson';
+        nContainer.style.display = 'block';
+        pSlider.min = '0';
+        pSlider.max = '1';
+        pSlider.step = '0.01';
+        pSlider.value = lastP;
+        pLabel.innerHTML = `p (probability): <span class="slider-value" id="pValue">${lastP.toFixed(2)}</span>`;
+        currentN = lastN;
+        nSlider.value = currentN;
+        nValue.textContent = currentN;
+      }
+      pValue = document.getElementById('pValue');
+      updateChart();
+      infoEl.innerHTML = `${currentMode.charAt(0).toUpperCase() + currentMode.slice(1)} Distribution`;
+    });
+    // ========== Click for Probability ==========
     scene.addEventListener('click', e => {
       if (e.target.classList.contains('clickable')) {
         const k = e.target.getAttribute('data-k'), pk = e.target.getAttribute('data-pk');
         alert(`P(X=${k}) = ${pk}`);
       }
     });
-
     // ========== Ground Detection ==========
     AFRAME.registerComponent('ground-tracker', {
       tick: function () {
@@ -289,12 +353,11 @@
         }
       }
     });
-
     // ========== Initialize ==========
     window.onload = () => {
       setTimeout(() => {
-        drawChart(10, 0.5);
-        infoEl.innerHTML = 'Ready! Use + / − to zoom';
+        drawChart();
+        infoEl.innerHTML = 'Binomial Distribution<br>Ready! Use + / − to zoom';
       }, 1500);
     };
   </script>
