@@ -4,20 +4,14 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>AR Binomial Distribution</title>
-
-  <!-- A‑Frame -->
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-
-  <!-- AR.js (marker‑less, works on both platforms) -->
   <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar-nft.js"></script>
-
   <style>
     * { margin:0; padding:0; box-sizing:border-box; }
     body { overflow:hidden; font-family:-apple-system,BlinkMacSystemFont,Helvetica,sans-serif; background:#000; }
 
     .info { position:absolute; top:15px; left:15px; right:15px; color:#fff; background:rgba(0,0,0,0.85);
-            padding:10px 14px; border-radius:12px; font-size:14px; text-align:center; z-index:100;
-            backdrop-filter:blur(6px); }
+            padding:10px 14px; border-radius:12px; font-size:14px; text-align:center; z-index:100; backdrop-filter:blur(6px); }
     .lidar-status { position:absolute; top:70px; left:50%; transform:translateX(-50%);
                     background:#34c759; color:#fff; padding:6px 16px; border-radius:20px;
                     font-size:13px; font-weight:bold; z-index:100; display:none; }
@@ -61,12 +55,18 @@
                     background:rgba(0,0,0,.8); color:#fff; padding:8px 16px;
                     border-radius:20px; font-size:13px; z-index:100; }
 
+    .force-btn { position:fixed; top:80px; right:10px; z-index:999; padding:10px 14px;
+                 background:#ff9500; color:white; border:none; border-radius:8px; font-weight:bold; }
+
     .ui-dragging * { opacity:.3 !important; }
   </style>
 </head>
 <body>
-  <div class="info" id="info">Initializing…</div>
+  <div class="info" id="info">請將鏡頭對準地板掃描…</div>
   <div class="lidar-status" id="lidarStatus">Ground Detected</div>
+
+  <!-- 強制重繪按鈕 -->
+  <button class="force-btn" id="forceRedraw">強制重繪</button>
 
   <!-- Zoom -->
   <div class="zoom-controls">
@@ -80,7 +80,7 @@
   <div class="control expanded" id="controlPanel">
     <div class="control-header" id="panelHeader">
       <span>Settings</span>
-      <span class="toggle-icon">▲</span>
+      <span class="toggle-icon">Up Arrow</span>
     </div>
     <div class="sliders">
       <div class="slider-container">
@@ -94,7 +94,7 @@
     </div>
   </div>
 
-  <!-- A‑Frame Scene -->
+  <!-- A-Frame Scene -->
   <a-scene
     embedded
     vr-mode-ui="enabled: false"
@@ -125,6 +125,7 @@
     const pVal    = document.getElementById('pValue');
     const zoomIn  = document.getElementById('zoomInBtn');
     const zoomOut = document.getElementById('zoomOutBtn');
+    const forceBtn = document.getElementById('forceRedraw');
 
     let n = 10, p = 0.5, zoom = 1;
 
@@ -140,7 +141,7 @@
       }
     });
 
-    // ================== Zoom Component ==================
+    // ================== Zoom Control ==================
     AFRAME.registerComponent('zoom-control', {
       init: function () {
         const el = this.el;
@@ -157,7 +158,7 @@
       }
     });
 
-    // ================== Drag‑Only ==================
+    // ================== Drag-Only ==================
     AFRAME.registerComponent('drag-only', {
       init: function () {
         const el = this.el;
@@ -189,7 +190,8 @@
       for (let i = 1; i <= k; ++i) r = r * (n - i + 1) / i;
       return Math.round(r * 1e5) / 1e5;
     };
-    const binomial = (n, p) => {
+
+    const binomialData = (n, p) => {
       const data = [];
       for (let k = 0; k <= n; ++k) {
         const prob = C(n, k) * Math.pow(p, k) * Math.pow(1 - p, n - k);
@@ -201,7 +203,7 @@
     // ================== Draw Chart ==================
     const draw = (n, p) => {
       while (scene.firstChild) scene.removeChild(scene.firstChild);
-      const data = binomial(n, p);
+      const data = binomialData(n, p);
       const maxP = Math.max(...data.map(d => d.prob), 1);
       const yScale = MAX_HEIGHT / maxP;
 
@@ -211,9 +213,7 @@
 
         const bar = document.createElement('a-box');
         bar.setAttribute('position', `${x} ${FIXED_BASE_Y + h/2} 0`);
-        bar.setAttribute('width', BAR_WIDTH);
-        bar.setAttribute('depth', BAR_WIDTH);
-        bar.setAttribute('height', h);
+        bar.setAttribute('width', BAR_WIDTH); bar.setAttribute('depth', BAR_WIDTH); bar.setAttribute('height', h);
         bar.setAttribute('color', '#4a90e2');
         bar.classList.add('clickable');
         bar.dataset.k = d.k;
@@ -251,26 +251,44 @@
       }
     });
 
-    // ================== Ground Tracker ==================
+    // ================== Ground Tracker (Auto Draw!) ==================
     AFRAME.registerComponent('ground-tracker', {
+      init: function () { this.hasDrawn = false; },
       tick: function () {
         const cam = this.el.sceneEl.camera;
-        if (!cam) return;
+        if (!cam || this.hasDrawn) return;
         const ray = new THREE.Raycaster(cam.getWorldPosition(new THREE.Vector3()), new THREE.Vector3(0, -1, 0));
         const hits = ray.intersectObjects(this.el.sceneEl.object3D.children, true);
         if (hits[0]) {
           this.el.object3D.position.y = hits[0].point.y + 0.08;
           lidarEl.style.display = 'block';
+          infoEl.textContent = 'Drawing...';
+          setTimeout(() => {
+            draw(n, p);
+            infoEl.textContent = 'Ready! Use + / − to zoom';
+            this.hasDrawn = true;
+          }, 500);
         }
       }
+    });
+
+    // ================== Force Redraw ==================
+    forceBtn.addEventListener('click', () => {
+      const group = document.querySelector('#modelGroup');
+      group.object3D.position.y = 0.15;
+      lidarEl.style.display = 'block';
+      infoEl.textContent = '手動重繪中...';
+      draw(n, p);
+      infoEl.textContent = '完成！';
     });
 
     // ================== Init ==================
     window.onload = () => {
       setTimeout(() => {
-        draw(10, 0.5);
-        infoEl.textContent = 'Ready! Use + / − to zoom';
-      }, 1500);
+        if (!lidarEl.style.display || lidarEl.style.display === 'none') {
+          infoEl.textContent = '未偵測到地面？點「強制重繪」試試';
+        }
+      }, 5000);
     };
   </script>
 </body>
