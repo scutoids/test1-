@@ -73,13 +73,17 @@
     }
     input[type=range]::-webkit-slider-thumb:active { transform: scale(1.1); }
 
-    .zoom-controls { position: absolute; bottom: 110px; right: 20px; z-index: 200; display: flex; gap: 14px; }
+    /* Zoom Buttons - 改為 + / − */
+    .zoom-controls {
+      position: absolute; bottom: 110px; right: 20px; z-index: 200; display: flex; gap: 14px;
+    }
     .zoom-btn {
-      background: rgba(255,255,255,0.95); color: #000; border: none; width: 48px; height: 48px;
-      border-radius: 50%; font-size: 22px; font-weight: bold;
+      background: rgba(255,255,255,0.95); color: #000; border: none;
+      width: 48px; height: 48px; border-radius: 50%;
+      font-size: 26px; font-weight: 900; line-height: 1;
       box-shadow: 0 6px 16px rgba(0,0,0,0.2); cursor: pointer;
       display: flex; align-items: center; justify-content: center;
-      transition: all 0.2s ease;
+      transition: all 0.2s ease; user-select: none;
     }
     .zoom-btn:active { transform: scale(0.92); }
 
@@ -93,7 +97,7 @@
   </style>
 </head>
 <body>
-  <!-- 右上角切換按鈕 -->
+  <!-- 右上角模型切換按鈕 -->
   <div class="status-bar">
     <div class="model-switch-btn" id="modelSwitchBtn">
       <span id="modelText">Poisson</span>
@@ -103,9 +107,10 @@
   <div class="info" id="info">Point camera at floor to start...</div>
   <div class="ground-detected" id="groundStatus">Ground Detected</div>
 
+  <!-- Zoom Buttons: + / − -->
   <div class="zoom-controls">
-    <button class="zoom-btn" id="zoomOutBtn">Minus</button>
-    <button class="zoom-btn" id="zoomInBtn">Plus</button>
+    <button class="zoom-btn" id="zoomOutBtn">−</button>
+    <button class="zoom-btn" id="zoomInBtn">+</button>
   </div>
 
   <div class="gesture-hint">Drag with one finger to move</div>
@@ -153,11 +158,11 @@
     let zoom = 1.0;
     let lambda = 5.0, n = 10, probP = 0.5;
 
-    // ========== 強制重繪函數 ==========
+    // ========== 強制重繪 ==========
     function forceDraw() {
       updateSliders();
       draw();
-      infoEl.textContent = 'Ready! Use Plus/Minus to zoom';
+      infoEl.textContent = 'Ready! Use + / − to zoom';
     }
 
     // ========== Model Switch ==========
@@ -215,7 +220,7 @@
     const poisson = (k, λ) => Math.pow(λ, k) * Math.exp(-λ) / factorial(k);
     const factorial = n => n <= 1 ? 1 : n * factorial(n - 1);
 
-    // ========== Draw (穩定版) ==========
+    // ========== Draw ==========
     function draw() {
       while (scene.firstChild) scene.removeChild(scene.firstChild);
       let data = [], maxP = 0.001, color = '#007aff';
@@ -298,7 +303,6 @@
       }
     });
 
-    // ========== Ground Tracker (關鍵！) ==========
     AFRAME.registerComponent('ground-tracker', {
       init: function () { this.hasDrawn = false; },
       tick: function () {
@@ -311,7 +315,7 @@
           groundEl.style.display = 'block';
           infoEl.textContent = 'Loading model...';
           setTimeout(() => {
-            forceDraw();  // 關鍵：強制畫圖
+            forceDraw();
             this.hasDrawn = true;
           }, 500);
         }
@@ -338,11 +342,11 @@
       }
     });
 
-    // ========== Init (保險畫一次) ==========
+    // ========== Init ==========
     window.onload = () => {
       setTimeout(() => {
         forceDraw();
-      }, 2000); // 2 秒後強制畫
+      }, 2000);
     };
   </script>
 </body>
