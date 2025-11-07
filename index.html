@@ -10,7 +10,6 @@
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #000; }
 
-    /* Top Status Bar - 右上角模型切換按鈕 */
     .status-bar {
       position: absolute; top: 0; left: 0; right: 0; height: 50px;
       background: rgba(0,0,0,0.7); backdrop-filter: blur(12px);
@@ -25,17 +24,14 @@
       transition: all 0.2s ease; display: flex; align-items: center; gap: 6px;
       min-width: 100px; justify-content: center;
     }
-    .model-switch-btn:active { transform: translateY(1px); box-shadow: 0 2px 6px rgba(0,122,255,0.3); }
+    .model-switch-btn:active { transform: translateY(1px); }
 
-    /* Info Panel */
     .info {
       position: absolute; top: 60px; left: 16px; right: 16px;
       color: #fff; background: rgba(30,30,30,0.92); padding: 10px 14px;
       border-radius: 14px; font-size: 13px; text-align: center; z-index: 200;
       backdrop-filter: blur(16px); box-shadow: 0 4px 12px rgba(0,0,0,0.3);
     }
-
-    /* Ground Detected */
     .ground-detected {
       position: absolute; top: 106px; left: 50%; transform: translateX(-50%);
       background: linear-gradient(135deg, #34c759, #30d158); color: white;
@@ -43,7 +39,6 @@
       z-index: 200; display: none; box-shadow: 0 4px 12px rgba(52,199,89,0.4);
     }
 
-    /* Control Panel */
     .control {
       position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%);
       width: 90%; max-width: 380px; border-radius: 20px;
@@ -61,17 +56,12 @@
     }
     .toggle-icon { font-size: 22px; transition: transform 0.3s ease; }
     .control.collapsed .toggle-icon { transform: rotate(180deg); }
-
     .sliders { margin-top: 16px; opacity: 1; transition: all 0.3s ease; }
     .control.collapsed .sliders { opacity: 0; height: 0; margin: 0; overflow: hidden; pointer-events: none; }
 
     .slider-container { margin: 18px 0; }
-    .slider-label {
-      display: block; margin-bottom: 8px; font-weight: 600; font-size: 14px; color: #fff;
-    }
-    .slider-value {
-      display: inline-block; width: 70px; color: #007aff; font-weight: bold; font-size: 14px;
-    }
+    .slider-label { display: block; margin-bottom: 8px; font-weight: 600; font-size: 14px; color: #fff; }
+    .slider-value { display: inline-block; width: 70px; color: #007aff; font-weight: bold; font-size: 14px; }
     input[type=range] {
       -webkit-appearance: none; width: 100%; height: 8px; border-radius: 6px;
       background: #444; outline: none; margin: 10px 0;
@@ -81,14 +71,9 @@
       background: #007aff; box-shadow: 0 3px 8px rgba(0,122,255,0.4);
       cursor: pointer; transition: all 0.2s ease;
     }
-    input[type=range]::-webkit-slider-thumb:active {
-      transform: scale(1.1); box-shadow: 0 4px 12px rgba(0,122,255,0.6);
-    }
+    input[type=range]::-webkit-slider-thumb:active { transform: scale(1.1); }
 
-    /* Zoom Buttons */
-    .zoom-controls {
-      position: absolute; bottom: 110px; right: 20px; z-index: 200; display: flex; gap: 14px;
-    }
+    .zoom-controls { position: absolute; bottom: 110px; right: 20px; z-index: 200; display: flex; gap: 14px; }
     .zoom-btn {
       background: rgba(255,255,255,0.95); color: #000; border: none; width: 48px; height: 48px;
       border-radius: 50%; font-size: 22px; font-weight: bold;
@@ -98,7 +83,6 @@
     }
     .zoom-btn:active { transform: scale(0.92); }
 
-    /* Gesture Hint */
     .gesture-hint {
       position: absolute; bottom: 110px; left: 50%; transform: translateX(-50%);
       background: rgba(0,0,0,0.7); color: #fff; padding: 8px 16px;
@@ -109,27 +93,23 @@
   </style>
 </head>
 <body>
-  <!-- 右上角模型切換按鈕 -->
+  <!-- 右上角切換按鈕 -->
   <div class="status-bar">
     <div class="model-switch-btn" id="modelSwitchBtn">
       <span id="modelText">Poisson</span>
     </div>
   </div>
 
-  <!-- Info & Ground Status -->
   <div class="info" id="info">Point camera at floor to start...</div>
   <div class="ground-detected" id="groundStatus">Ground Detected</div>
 
-  <!-- Zoom -->
   <div class="zoom-controls">
     <button class="zoom-btn" id="zoomOutBtn">Minus</button>
     <button class="zoom-btn" id="zoomInBtn">Plus</button>
   </div>
 
-  <!-- Gesture Hint -->
   <div class="gesture-hint">Drag with one finger to move</div>
 
-  <!-- Control Panel -->
   <div class="control expanded" id="controlPanel">
     <div class="control-header" id="panelHeader">
       <span id="panelTitle">Poisson Settings</span>
@@ -138,7 +118,6 @@
     <div class="sliders" id="sliders"></div>
   </div>
 
-  <!-- A-Frame Scene -->
   <a-scene
     embedded
     vr-mode-ui="enabled: false"
@@ -170,18 +149,23 @@
     const zoomIn = document.getElementById('zoomInBtn');
     const zoomOut = document.getElementById('zoomOutBtn');
 
-    let mode = 'poisson'; // 'binomial' or 'poisson'
+    let mode = 'poisson';
     let zoom = 1.0;
-    let lambda = 5.0, n = 10, probP = 0.5; // probP 避免衝突
+    let lambda = 5.0, n = 10, probP = 0.5;
+
+    // ========== 強制重繪函數 ==========
+    function forceDraw() {
+      updateSliders();
+      draw();
+      infoEl.textContent = 'Ready! Use Plus/Minus to zoom';
+    }
 
     // ========== Model Switch ==========
     switchBtn.addEventListener('click', () => {
       mode = mode === 'poisson' ? 'binomial' : 'poisson';
-      const isPoisson = mode === 'poisson';
-      modelText.textContent = isPoisson ? 'Poisson' : 'Binomial';
-      panelTitle.textContent = isPoisson ? 'Poisson Settings' : 'Binomial Settings';
-      updateSliders();
-      draw();
+      modelText.textContent = mode === 'poisson' ? 'Poisson' : 'Binomial';
+      panelTitle.textContent = mode === 'poisson' ? 'Poisson Settings' : 'Binomial Settings';
+      forceDraw();
     });
 
     // ========== Dynamic Sliders ==========
@@ -193,9 +177,11 @@
             <span class="slider-label">λ (mean rate): <span class="slider-value" id="lambdaVal">5.0</span></span>
             <input type="range" min="1" max="200" value="50" step="1" id="lambdaSlider">
           </div>`;
-        const s = document.getElementById('lambdaSlider');
-        const v = document.getElementById('lambdaVal');
-        s.addEventListener('input', () => { lambda = s.value / 10; v.textContent = lambda.toFixed(1); draw(); });
+        document.getElementById('lambdaSlider').addEventListener('input', () => {
+          lambda = document.getElementById('lambdaSlider').value / 10;
+          document.getElementById('lambdaVal').textContent = lambda.toFixed(1);
+          draw();
+        });
       } else {
         slidersContainer.innerHTML = `
           <div class="slider-container">
@@ -206,10 +192,16 @@
             <span class="slider-label">p (probability): <span class="slider-value" id="pVal">0.50</span></span>
             <input type="range" min="0" max="100" value="50" step="1" id="pSlider">
           </div>`;
-        const ns = document.getElementById('nSlider'), ps = document.getElementById('pSlider');
-        const nv = document.getElementById('nVal'), pv = document.getElementById('pVal');
-        ns.addEventListener('input', () => { n = +ns.value; nv.textContent = n; draw(); });
-        ps.addEventListener('input', () => { probP = ps.value / 100; pv.textContent = probP.toFixed(2); draw(); });
+        document.getElementById('nSlider').addEventListener('input', () => {
+          n = +document.getElementById('nSlider').value;
+          document.getElementById('nVal').textContent = n;
+          draw();
+        });
+        document.getElementById('pSlider').addEventListener('input', () => {
+          probP = document.getElementById('pSlider').value / 100;
+          document.getElementById('pVal').textContent = probP.toFixed(2);
+          draw();
+        });
       }
     }
 
@@ -220,11 +212,10 @@
       for (let i = 1; i <= k; ++i) r = r * (n - i + 1) / i;
       return Math.round(r * 1e5) / 1e5;
     };
-
     const poisson = (k, λ) => Math.pow(λ, k) * Math.exp(-λ) / factorial(k);
     const factorial = n => n <= 1 ? 1 : n * factorial(n - 1);
 
-    // ========== Draw (防消失修復) ==========
+    // ========== Draw (穩定版) ==========
     function draw() {
       while (scene.firstChild) scene.removeChild(scene.firstChild);
       let data = [], maxP = 0.001, color = '#007aff';
@@ -244,8 +235,6 @@
       }
 
       maxP = Math.max(...data.map(d => d.p), 0.001);
-      if (maxP <= 0) maxP = 0.001;
-
       const yScale = MAX_HEIGHT / maxP;
       const center = data.length > 0 ? data[Math.floor(data.length / 2)].k : 0;
 
@@ -275,9 +264,59 @@
     }
 
     // ========== Components ==========
-    AFRAME.registerComponent('zoom-control', { /* 同上 */ });
-    AFRAME.registerComponent('drag-only', { /* 同上 */ });
-    AFRAME.registerComponent('ground-tracker', { /* 同上，包含 draw() 呼叫 */ });
+    AFRAME.registerComponent('zoom-control', {
+      init: function () {
+        const el = this.el;
+        zoomIn.addEventListener('click', () => {
+          zoom = Math.min(zoom * 1.5, 3); el.setAttribute('scale', `${0.6*zoom} ${0.6*zoom} ${0.6*zoom}`);
+          infoEl.textContent = `Zoom: ×${zoom.toFixed(1)}`;
+        });
+        zoomOut.addEventListener('click', () => {
+          zoom = Math.max(zoom / 1.5, 0.3); el.setAttribute('scale', `${0.6*zoom} ${0.6*zoom} ${0.6*zoom}`);
+          infoEl.textContent = `Zoom: ×${zoom.toFixed(1)}`;
+        });
+      }
+    });
+
+    AFRAME.registerComponent('drag-only', {
+      init: function () {
+        const el = this.el;
+        let sx, sz, dragging = false;
+        el.addEventListener('gesturestart', e => {
+          if (e.detail.touches !== 1) return;
+          const p = el.object3D.position;
+          sx = p.x; sz = p.z; dragging = true;
+          document.body.classList.add('ui-dragging');
+        });
+        el.addEventListener('gesturechange', e => {
+          if (!dragging || e.detail.touches !== 1) return;
+          const d = e.detail.delta;
+          el.object3D.position.x = sx + d.x * 0.001;
+          el.object3D.position.z = sz + d.z * 0.001;
+        });
+        el.addEventListener('gestureend', () => { dragging = false; document.body.classList.remove('ui-dragging'); });
+      }
+    });
+
+    // ========== Ground Tracker (關鍵！) ==========
+    AFRAME.registerComponent('ground-tracker', {
+      init: function () { this.hasDrawn = false; },
+      tick: function () {
+        const cam = this.el.sceneEl.camera;
+        if (!cam || this.hasDrawn) return;
+        const ray = new THREE.Raycaster(cam.getWorldPosition(new THREE.Vector3()), new THREE.Vector3(0, -1, 0));
+        const hits = ray.intersectObjects(this.el.sceneEl.object3D.children, true);
+        if (hits[0]) {
+          this.el.object3D.position.set(0, hits[0].point.y + 0.1, -0.8);
+          groundEl.style.display = 'block';
+          infoEl.textContent = 'Loading model...';
+          setTimeout(() => {
+            forceDraw();  // 關鍵：強制畫圖
+            this.hasDrawn = true;
+          }, 500);
+        }
+      }
+    });
 
     // ========== Panel Toggle ==========
     let clicks = 0;
@@ -299,13 +338,11 @@
       }
     });
 
-    // ========== Init ==========
+    // ========== Init (保險畫一次) ==========
     window.onload = () => {
       setTimeout(() => {
-        updateSliders();
-        draw();
-        infoEl.textContent = 'Ready! Use Plus/Minus to zoom';
-      }, 1500);
+        forceDraw();
+      }, 2000); // 2 秒後強制畫
     };
   </script>
 </body>
