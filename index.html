@@ -95,7 +95,7 @@
     arjs="sourceType: webcam;" aframe-arkit aframe-arkit-device
     light="ambientIntensity: 1.5;"
   >
-    <!-- 模型群組：固定縮放 ×3.0，只支援拖曳與置中 -->
+    <!-- 模型群組：固定 ×3.0，支援拖曳，鏡頭移動時跟隨 -->
     <a-entity id="modelGroup" scale="0.9 0.9 0.9" drag-only center-in-view></a-entity>
     <a-camera></a-camera>
   </a-scene>
@@ -105,8 +105,9 @@
     const BAR_WIDTH = 0.05, SPACING = 0.08;
     const CHART_BASE_Y = 0.15;
     const MAX_HEIGHT = 0.8;
-    const CHART_DISTANCE = 1.2;
-    const CHART_HEIGHT_OFFSET = 0.3;
+    const CHART_DISTANCE = 1.2;        // 距離相機
+    const CHART_HEIGHT_OFFSET = 0.3;   // 略高於視線
+    const FOLLOW_STRENGTH = 0.08;      // 跟隨速度（越小越平滑）
 
     // ========== DOM Elements ==========
     const scene = document.querySelector('#modelGroup');
@@ -136,7 +137,7 @@
       }, 300);
     });
 
-    // ========== Drag Only ==========
+    // ========== Drag Only (相對於當前位置) ==========
     AFRAME.registerComponent('drag-only', {
       init: function () {
         const el = this.el;
@@ -163,26 +164,32 @@
       }
     });
 
-    // ========== Center in View ==========
+    // ========== Center in View + Follow Camera ==========
     AFRAME.registerComponent('center-in-view', {
+      init: function () {
+        this.targetPos = new THREE.Vector3();
+        this.lookAtPos = new THREE.Vector3();
+      },
       tick: function () {
         const el = this.el;
         const camera = this.el.sceneEl.camera;
         if (!camera) return;
 
+        // 計算目標位置（相機前方）
         const forward = new THREE.Vector3(0, 0, -1);
         forward.applyQuaternion(camera.quaternion);
         forward.multiplyScalar(CHART_DISTANCE);
 
-        const targetPos = new THREE.Vector3();
-        targetPos.copy(camera.position);
-        targetPos.add(forward);
-        targetPos.y += CHART_HEIGHT_OFFSET;
+        this.targetPos.copy(camera.position);
+        this.targetPos.add(forward);
+        this.targetPos.y += CHART_HEIGHT_OFFSET;
 
-        el.object3D.position.lerp(targetPos, 0.1);
+        // 平滑跟隨（即使拖曳後也會緩慢回歸）
+        el.object3D.position.lerp(this.targetPos, FOLLOW_STRENGTH);
 
-        const lookAtPos = new THREE.Vector3(camera.position.x, el.object3D.position.y, camera.position.z);
-        el.object3D.lookAt(lookAtPos);
+        // 面向相機（水平）
+        this.lookAtPos.set(camera.position.x, el.object3D.position.y, camera.position.z);
+        el.object3D.lookAt(this.lookAtPos);
       }
     });
 
@@ -326,7 +333,7 @@
     window.onload = () => {
       setTimeout(() => {
         drawChart();
-        infoEl.innerHTML = 'Binomial Distribution<br>Ready! Fixed zoom ×3.0';
+        infoEl.innerHTML = 'Binomial Distribution<br>Model follows camera movement';
       }, 1500);
     };
   </script>
