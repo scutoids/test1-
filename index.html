@@ -14,7 +14,6 @@
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: #000; }
 
-    /* 頂部資訊 */
     .info {
       position: absolute; top: 15px; left: 160px; right: 15px;
       color: #fff; background: rgba(0,0,0,0.85); padding: 10px 14px;
@@ -22,7 +21,6 @@
       backdrop-filter: blur(6px);
     }
 
-    /* 模式切換按鈕 */
     .mode-btn {
       position: absolute; top: 15px; left: 15px; z-index: 101;
       background: rgba(0,0,0,0.85); color: #fff; padding: 10px 14px;
@@ -30,7 +28,6 @@
       backdrop-filter: blur(6px);
     }
 
-    /* 控制面板 */
     .control {
       position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%);
       width: 90%; max-width: 360px; border-radius: 18px;
@@ -65,7 +62,6 @@
       background: #007aff !important; box-shadow: 0 2px 6px rgba(0,0,0,0.4); margin-top: -8px;
     }
 
-    /* 縮放按鈕 */
     .zoom-controls {
       position: absolute; bottom: 100px; right: 20px; z-index: 100; display: flex; gap: 12px;
     }
@@ -77,7 +73,6 @@
     }
     .zoom-btn:active { transform: scale(0.9); }
 
-    /* 手勢提示 */
     .gesture-hint {
       position: absolute; bottom: 100px; left: 50%; transform: translateX(-50%);
       background: rgba(0,0,0,0.8); color: #fff; padding: 8px 16px;
@@ -89,22 +84,16 @@
 </head>
 <body>
 
-  <!-- 頂部資訊 -->
   <div class="info" id="info">初始化中...</div>
-
-  <!-- 模式切換 -->
   <button id="modeBtn" class="mode-btn">切換至泊松分布</button>
 
-  <!-- 縮放按鈕 -->
   <div class="zoom-controls">
     <button class="zoom-btn" id="zoomOutBtn">−</button>
     <button class="zoom-btn" id="zoomInBtn">＋</button>
   </div>
 
-  <!-- 手勢提示 -->
   <div class="gesture-hint">一指拖動平移圖表</div>
 
-  <!-- 控制面板 -->
   <div class="control expanded" id="controlPanel">
     <div class="control-header" id="panelHeader">
       <span>參數設定</span>
@@ -122,7 +111,6 @@
     </div>
   </div>
 
-  <!-- A-Frame 場景 -->
   <a-scene
     embedded
     vr-mode-ui="enabled: false"
@@ -139,7 +127,7 @@
     // ==================== 參數設定 ====================
     const BAR_WIDTH = 0.05;
     const SPACING = 0.08;
-    const FIXED_BASE_Y = 0.15;
+    const FIXED_BASE_Y = 0.30;   // 抬高底座，避免掉入地面
     const MAX_HEIGHT = 0.8;
 
     // ==================== DOM 元素 ====================
@@ -163,7 +151,7 @@
     let lastN = 10, lastP = 0.50, lastLambda = 5.0;
     let currentZoom = 1.0;
 
-    // ==================== 控制面板展開/收合 ====================
+    // ==================== 控制面板 ====================
     let clickCount = 0;
     panelHeader.addEventListener('click', () => {
       clickCount++;
@@ -193,7 +181,7 @@
       }
     });
 
-    // ==================== 單指拖曳 ====================
+    // ==================== 拖曳 ====================
     AFRAME.registerComponent('drag-only', {
       init: function () {
         const el = this.el;
@@ -220,25 +208,24 @@
       }
     });
 
-    // ==================== 模型浮空中央（不隨低頭移動） ====================
+    // ==================== 浮空中央（修正版） ====================
     AFRAME.registerComponent('face-camera-center', {
       tick: function () {
         const el = this.el;
         const camera = this.el.sceneEl.camera;
         if (!camera) return;
 
-        const FIXED_HEIGHT = 0.1;   // 模型固定高度
+        const FIXED_HEIGHT = 0.30;  // 模型浮空高度（與底座對齊）
         const DISTANCE = 1.0;       // 距離相機 1 米
 
         const camPos = camera.position;
         const camRot = camera.rotation;
 
-        // 僅使用水平旋轉 (yaw)，忽略俯仰 (pitch)
+        // 僅使用水平旋轉 (yaw)
         const forward = new THREE.Vector3(0, 0, -1);
         forward.applyEuler(new THREE.Euler(0, camRot.y, 0, 'XYZ'));
         forward.multiplyScalar(DISTANCE);
 
-        // 設定模型位置
         const targetPos = new THREE.Vector3(
           camPos.x + forward.x,
           FIXED_HEIGHT,
@@ -305,7 +292,7 @@
         const height = Math.max(d.pk * scaleY, 0.001);
         const xPos = (d.k - mean) * SPACING;
 
-        // 柱子
+        // 柱子：從 FIXED_BASE_Y 開始向上
         const bar = document.createElement('a-box');
         bar.setAttribute('position', `${xPos} ${FIXED_BASE_Y + height / 2} 0`);
         bar.setAttribute('width', BAR_WIDTH);
@@ -328,8 +315,8 @@
         scene.appendChild(label);
       });
 
-      // 地面
-      const groundWidth = (data.length - 1) * SPACING + BAR_WIDTH + 0.1;
+      // 地面：與柱子底部對齊
+      const groundWidth = (data.length - 1) * SPACING + BAR_WIDTH + 0.2;
       const ground = document.createElement('a-plane');
       ground.setAttribute('position', `0 ${FIXED_BASE_Y} 0`);
       ground.setAttribute('rotation', '-90 0 0');
@@ -341,12 +328,9 @@
       scene.appendChild(ground);
     }
 
-    // ==================== 更新圖表 ====================
-    function updateChart() {
-      drawChart();
-    }
+    // ==================== 更新與事件 ====================
+    function updateChart() { drawChart(); }
 
-    // ==================== 滑桿事件 ====================
     nSlider.addEventListener('input', () => {
       currentN = +nSlider.value;
       nValue.textContent = currentN;
@@ -361,7 +345,6 @@
       updateChart();
     });
 
-    // ==================== 模式切換 ====================
     modeBtn.addEventListener('click', () => {
       if (currentMode === 'binomial') {
         lastN = currentN; lastP = currentP;
@@ -370,7 +353,7 @@
         nContainer.style.display = 'none';
         pSlider.min = '0.1'; pSlider.max = '30'; pSlider.step = '0.1';
         pSlider.value = lastLambda; currentLambda = lastLambda;
-        pLabel.innerHTML = `λ (平均值): <span class="slider-value" id="pValue">${lastLambda.toFixed(2)}</span>`;
+        pLabel.innerHTML = `λ (平均值): <span class="slider-value">${lastLambda.toFixed(2)}</span>`;
       } else {
         lastLambda = currentLambda;
         currentMode = 'binomial';
@@ -379,13 +362,12 @@
         pSlider.min = '0'; pSlider.max = '1'; pSlider.step = '0.01';
         pSlider.value = lastP; currentN = lastN;
         nSlider.value = currentN; nValue.textContent = currentN;
-        pLabel.innerHTML = `p (成功機率): <span class="slider-value" id="pValue">${lastP.toFixed(2)}</span>`;
+        pLabel.innerHTML = `p (成功機率): <span class="slider-value">${lastP.toFixed(2)}</span>`;
       }
       updateChart();
-      infoEl.innerHTML = `${currentMode === 'binomial' ? '二項式' : '泊松'}分布`;
+      infoEl.innerHTML = currentMode === 'binomial' ? '二項式分布' : '泊松分布';
     });
 
-    // ==================== 點擊顯示機率 ====================
     scene.addEventListener('click', e => {
       if (e.target.classList.contains('clickable')) {
         const k = e.target.getAttribute('data-k');
@@ -394,7 +376,6 @@
       }
     });
 
-    // ==================== 初始化 ====================
     window.onload = () => {
       setTimeout(() => {
         drawChart();
