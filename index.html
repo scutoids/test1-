@@ -3,8 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>AR 分布圖 - 可調高度</title>
+  <title>AR 分布圖 - 穩定版</title>
 
+  <!-- 關鍵：使用 HTTPS 資源 -->
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
   <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar-nft.js"></script>
   <script src="https://cdn.jsdelivr.net/gh/AR-js-org/aframe-arkit@master/dist/aframe-arkit.min.js"></script>
@@ -45,7 +46,7 @@
 </head>
 <body>
 
-  <div class="info" id="info">初始化中...</div>
+  <div class="info" id="info">請允許相機權限...</div>
   <button id="modeBtn" class="mode-btn">切換至泊松分布</button>
 
   <div class="zoom-controls">
@@ -55,7 +56,6 @@
 
   <div class="gesture-hint">一指拖動平移圖表</div>
 
-  <!-- 控制面板（新增高度滑桿） -->
   <div class="control expanded" id="controlPanel">
     <div class="control-header" id="panelHeader">
       <span>參數設定</span>
@@ -70,7 +70,6 @@
         <span class="slider-label" id="pLabel">p (成功機率): <span class="slider-value" id="pValue">0.50</span></span>
         <input type="range" min="0" max="1" value="0.5" step="0.01" id="pSlider">
       </div>
-      <!-- 新增：高度調整滑桿 -->
       <div class="slider-container">
         <span class="slider-label">高度 (米): <span class="slider-value" id="heightValue">1.00</span></span>
         <input type="range" min="0.3" max="1.5" value="1.0" step="0.05" id="heightSlider">
@@ -78,7 +77,14 @@
     </div>
   </div>
 
-  <a-scene embedded vr-mode-ui="enabled: false" renderer="colorManagement: true; physicallyCorrectLights: true;" arjs="sourceType: webcam;" aframe-arkit aframe-arkit-device light="ambientIntensity: 1.5;">
+  <a-scene
+    embedded
+    vr-mode-ui="enabled: false"
+    renderer="colorManagement: true; physicallyCorrectLights: true;"
+    arjs="sourceType: webcam; debugUIEnabled: false;"
+    aframe-arkit aframe-arkit-device
+    light="ambientIntensity: 1.5;"
+  >
     <a-entity id="modelGroup" scale="0.3 0.3 0.3" drag-only zoom-control face-camera-center></a-entity>
     <a-camera></a-camera>
   </a-scene>
@@ -87,20 +93,21 @@
     // ==================== 參數設定 ====================
     const BAR_WIDTH = 0.05;
     const SPACING = 0.08;
-    let FIXED_BASE_Y = 1.0;  // 動態調整
+    let FIXED_BASE_Y = 1.0;
     const MAX_HEIGHT = 1.0;
 
     // ==================== DOM 元素 ====================
-    const scene = document.querySelector('#modelGroup');
+    const sceneEl = document.querySelector('a-scene');
+    const modelGroup = document.querySelector('#modelGroup');
     const infoEl = document.getElementById('info');
     const controlPanel = document.getElementById('controlPanel');
     const panelHeader = document.getElementById('panelHeader');
     const nSlider = document.getElementById('nSlider');
     const pSlider = document.getElementById('pSlider');
-    const heightSlider = document.getElementById('heightSlider');  // 新增
+    const heightSlider = document.getElementById('heightSlider');
     const nValue = document.getElementById('nValue');
     const pValue = document.getElementById('pValue');
-    const heightValue = document.getElementById('heightValue');    // 新增
+    const heightValue = document.getElementById('heightValue');
     const zoomInBtn = document.getElementById('zoomInBtn');
     const zoomOutBtn = document.getElementById('zoomOutBtn');
     const modeBtn = document.getElementById('modeBtn');
@@ -112,6 +119,7 @@
     let currentN = 10, currentP = 0.50, currentLambda = 5.0;
     let lastN = 10, lastP = 0.50, lastLambda = 5.0;
     let currentZoom = 1.0;
+    let isInitialized = false;
 
     // ==================== 控制面板 ====================
     let clickCount = 0;
@@ -126,45 +134,69 @@
       }, 300);
     });
 
-    // ==================== 縮放控制 ====================
+    // ==================== 元件註冊 ====================
     AFRAME.registerComponent('zoom-control', { /* 同前 */ });
-
-    // ==================== 拖曳 ====================
     AFRAME.registerComponent('drag-only', { /* 同前 */ });
 
-    // ==================== 浮空中央（使用動態高度） ====================
     AFRAME.registerComponent('face-camera-center', {
       tick: function () {
-        const el = this.el;
+        if (!this.el.sceneEl.camera) return;
         const camera = this.el.sceneEl.camera;
-        if (!camera) return;
-
-        const DISTANCE = 1.0;
         const camPos = camera.position;
         const camRot = camera.rotation;
 
         const forward = new THREE.Vector3(0, 0, -1);
         forward.applyEuler(new THREE.Euler(0, camRot.y, 0, 'XYZ'));
-        forward.multiplyScalar(DISTANCE);
+        forward.multiplyScalar(1.0);
 
         const targetPos = new THREE.Vector3(
           camPos.x + forward.x,
-          FIXED_BASE_Y,  // 動態同步
+          FIXED_BASE_Y,
           camPos.z + forward.z
         );
 
-        el.object3D.position.copy(targetPos);
-        el.object3D.lookAt(camPos.x, FIXED_BASE_Y, camPos.z);
+        this.el.object3D.position.copy(targetPos);
+        this.el.object3D.lookAt(camPos.x, FIXED_BASE_Y, camPos.z);
       }
     });
 
-    // ==================== 數學與繪圖函數 ====================
-    function binomialCoefficient(n, k) { /* 同前 */ }
-    function binomialData(n, p) { /* 同前 */ }
-    function poissonData(lambda) { /* 同前 */ }
+    // ==================== 數學與繪圖 ====================
+    function binomialCoefficient(n, k) {
+      if (k < 0 || k > n) return 0;
+      let res = 1;
+      for (let i = 1; i <= k; ++i) res = res * (n - i + 1) / i;
+      return Math.round(res * 100000) / 100000;
+    }
+
+    function binomialData(n, p) {
+      const data = [];
+      for (let k = 0; k <= n; ++k) {
+        const pk = binomialCoefficient(n, k) * Math.pow(p, k) * Math.pow(1 - p, n - k);
+        data.push({ k, pk });
+      }
+      return data;
+    }
+
+    function poissonData(lambda) {
+      if (lambda <= 0) return [{k: 0, pk: 1}];
+      const data = [];
+      let pk = Math.exp(-lambda);
+      let cumProb = pk;
+      data.push({k: 0, pk});
+      let k = 1;
+      while (cumProb < 0.999 || pk > 1e-5) {
+        pk = pk * lambda / k;
+        data.push({k, pk});
+        cumProb += pk;
+        k++;
+        if (k > lambda + 50) break;
+      }
+      return data;
+    }
 
     function drawChart() {
-      while (scene.firstChild) scene.removeChild(scene.firstChild);
+      if (!modelGroup || isInitialized === false) return;
+      while (modelGroup.firstChild) modelGroup.removeChild(modelGroup.firstChild);
 
       let data, mean;
       if (currentMode === 'binomial') {
@@ -188,7 +220,7 @@
         bar.setAttribute('width', BAR_WIDTH); bar.setAttribute('depth', BAR_WIDTH); bar.setAttribute('height', height);
         bar.setAttribute('color', '#4a90e2'); bar.setAttribute('class', 'clickable');
         bar.setAttribute('data-k', d.k); bar.setAttribute('data-pk', d.pk.toFixed(6));
-        scene.appendChild(bar);
+        modelGroup.appendChild(bar);
 
         const label = document.createElement('a-text');
         label.setAttribute('value', d.k);
@@ -196,7 +228,7 @@
         label.setAttribute('rotation', '-90 0 0');
         label.setAttribute('scale', '0.2 0.2 0.2');
         label.setAttribute('color', '#fff'); label.setAttribute('align', 'center');
-        scene.appendChild(label);
+        modelGroup.appendChild(label);
       });
 
       const groundWidth = (data.length - 1) * SPACING + BAR_WIDTH + 0.2;
@@ -205,16 +237,32 @@
       ground.setAttribute('rotation', '-90 0 0');
       ground.setAttribute('width', groundWidth); ground.setAttribute('depth', 1.2);
       ground.setAttribute('color', '#333'); ground.setAttribute('opacity', '0.8'); ground.setAttribute('transparent', 'true');
-      scene.appendChild(ground);
+      modelGroup.appendChild(ground);
     }
 
-    function updateChart() { drawChart(); }
+    // ==================== 初始化監聽（關鍵修正）===================
+    sceneEl.addEventListener('loaded', () => {
+      infoEl.innerHTML = '相機啟動中...';
+    });
+
+    sceneEl.addEventListener('camera-ready', () => {
+      if (isInitialized) return;
+      isInitialized = true;
+      infoEl.innerHTML = '二項式分布<br>就緒！拖動高度調整位置';
+      drawChart();
+    });
+
+    // 監聽相機錯誤
+    sceneEl.addEventListener('arError', (e) => {
+      infoEl.innerHTML = 'AR 錯誤：<br>請檢查相機權限或使用 HTTPS';
+      console.error('AR Error:', e);
+    });
 
     // ==================== 滑桿事件 ====================
     nSlider.addEventListener('input', () => {
       currentN = +nSlider.value;
       nValue.textContent = currentN;
-      updateChart();
+      if (isInitialized) drawChart();
     });
 
     pSlider.addEventListener('input', () => {
@@ -222,29 +270,48 @@
       if (currentMode === 'binomial') currentP = val;
       else currentLambda = val;
       pValue.textContent = val.toFixed(2);
-      updateChart();
+      if (isInitialized) drawChart();
     });
 
-    // 新增：高度滑桿
     heightSlider.addEventListener('input', () => {
       FIXED_BASE_Y = parseFloat(heightSlider.value);
       heightValue.textContent = FIXED_BASE_Y.toFixed(2);
-      updateChart();  // 立即重繪
+      if (isInitialized) drawChart();
     });
 
     // ==================== 模式切換 ====================
-    modeBtn.addEventListener('click', () => { /* 同前，略 */ });
+    modeBtn.addEventListener('click', () => {
+      if (currentMode === 'binomial') {
+        lastN = currentN; lastP = currentP;
+        currentMode = 'poisson';
+        modeBtn.textContent = '切換至二項式分布';
+        nContainer.style.display = 'none';
+        pSlider.min = '0.1'; pSlider.max = '30'; pSlider.step = '0.1';
+        pSlider.value = lastLambda; currentLambda = lastLambda;
+        pLabel.innerHTML = `λ (平均值): <span class="slider-value">${lastLambda.toFixed(2)}</span>`;
+      } else {
+        lastLambda = currentLambda;
+        currentMode = 'binomial';
+        modeBtn.textContent = '切換至泊松分布';
+        nContainer.style.display = 'block';
+        pSlider.min = '0'; pSlider.max = '1'; pSlider.step = '0.01';
+        pSlider.value = lastP; currentN = lastN;
+        nSlider.value = currentN; nValue.textContent = currentN;
+        pLabel.innerHTML = `p (成功機率): <span class="slider-value">${lastP.toFixed(2)}</span>`;
+      }
+      if (isInitialized) drawChart();
+      infoEl.innerHTML = currentMode === 'binomial' ? '二項式分布' : '泊松分布';
+    });
 
     // ==================== 點擊顯示機率 ====================
-    scene.addEventListener('click', e => { /* 同前 */ });
+    modelGroup.addEventListener('click', e => {
+      if (e.target.classList.contains('clickable')) {
+        const k = e.target.getAttribute('data-k');
+        const pk = e.target.getAttribute('data-pk');
+        alert(`P(X=${k}) = ${pk}`);
+      }
+    });
 
-    // ==================== 初始化 ====================
-    window.onload = () => {
-      setTimeout(() => {
-        drawChart();
-        infoEl.innerHTML = '二項式分布<br>就緒！拖動「高度」調整浮空位置';
-      }, 1500);
-    };
   </script>
 </body>
 </html>
