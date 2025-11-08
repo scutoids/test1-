@@ -1,9 +1,10 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-HK">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>AR Binomial ↔ Poisson</title>
+  <title>AR 二項式 ↔ 泊松分布</title>
+
   <!-- A-Frame & AR.js -->
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
   <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar-nft.js"></script>
@@ -13,7 +14,7 @@
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: #000; }
 
-    /* Top Info */
+    /* 頂部資訊 */
     .info {
       position: absolute; top: 15px; left: 160px; right: 15px;
       color: #fff; background: rgba(0,0,0,0.85); padding: 10px 14px;
@@ -21,7 +22,7 @@
       backdrop-filter: blur(6px);
     }
 
-    /* Mode Button */
+    /* 模式切換按鈕 */
     .mode-btn {
       position: absolute; top: 15px; left: 15px; z-index: 101;
       background: rgba(0,0,0,0.85); color: #fff; padding: 10px 14px;
@@ -29,7 +30,7 @@
       backdrop-filter: blur(6px);
     }
 
-    /* Control Panel */
+    /* 控制面板 */
     .control {
       position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%);
       width: 90%; max-width: 360px; border-radius: 18px;
@@ -39,12 +40,15 @@
     }
     .control.collapsed { height: 56px; padding: 0 16px; }
     .control.expanded { padding: 20px 16px 24px; }
+
     .control-header {
       display: flex; justify-content: space-between; align-items: center;
-      height: 56px; cursor: pointer; user-select: none; font-weight: 600; font-size: 15px; color: #fff;
+      height: 56px; cursor: pointer; user-select: none; font-weight: 600;
+      font-size: 15px; color: #fff;
     }
     .toggle-icon { font-size: 20px; transition: transform 0.3s; }
     .control.collapsed .toggle-icon { transform: rotate(180deg); }
+
     .sliders { margin-top: 16px; opacity: 1; transition: opacity 0.3s; }
     .control.collapsed .sliders { opacity: 0; height: 0; margin: 0; overflow: hidden; pointer-events: none; }
 
@@ -61,7 +65,7 @@
       background: #007aff !important; box-shadow: 0 2px 6px rgba(0,0,0,0.4); margin-top: -8px;
     }
 
-    /* Zoom Buttons */
+    /* 縮放按鈕 */
     .zoom-controls {
       position: absolute; bottom: 100px; right: 20px; z-index: 100; display: flex; gap: 12px;
     }
@@ -73,7 +77,7 @@
     }
     .zoom-btn:active { transform: scale(0.9); }
 
-    /* Gesture Hint */
+    /* 手勢提示 */
     .gesture-hint {
       position: absolute; bottom: 100px; left: 50%; transform: translateX(-50%);
       background: rgba(0,0,0,0.8); color: #fff; padding: 8px 16px;
@@ -85,41 +89,46 @@
 </head>
 <body>
 
-  <div class="info" id="info">Initializing...</div>
-  <button id="modeBtn" class="mode-btn">Switch to Poisson</button>
+  <!-- 頂部資訊 -->
+  <div class="info" id="info">初始化中...</div>
 
-  <!-- Zoom Buttons -->
+  <!-- 模式切換 -->
+  <button id="modeBtn" class="mode-btn">切換至泊松分布</button>
+
+  <!-- 縮放按鈕 -->
   <div class="zoom-controls">
     <button class="zoom-btn" id="zoomOutBtn">−</button>
     <button class="zoom-btn" id="zoomInBtn">＋</button>
   </div>
 
-  <!-- Gesture Hint -->
+  <!-- 手勢提示 -->
   <div class="gesture-hint">一指拖動平移圖表</div>
 
-  <!-- Control Panel -->
+  <!-- 控制面板 -->
   <div class="control expanded" id="controlPanel">
     <div class="control-header" id="panelHeader">
-      <span>Settings</span>
-      <span class="toggle-icon">Up Arrow</span>
+      <span>參數設定</span>
+      <span class="toggle-icon">▲</span>
     </div>
     <div class="sliders">
       <div class="slider-container">
-        <span class="slider-label">n (trials): <span class="slider-value" id="nValue">10</span></span>
+        <span class="slider-label">n (試驗次數): <span class="slider-value" id="nValue">10</span></span>
         <input type="range" min="1" max="20" value="10" id="nSlider">
       </div>
       <div class="slider-container">
-        <span class="slider-label">p (probability): <span class="slider-value" id="pValue">0.50</span></span>
+        <span class="slider-label" id="pLabel">p (成功機率): <span class="slider-value" id="pValue">0.50</span></span>
         <input type="range" min="0" max="1" value="0.5" step="0.01" id="pSlider">
       </div>
     </div>
   </div>
 
-  <!-- A-Frame Scene -->
+  <!-- A-Frame 場景 -->
   <a-scene
-    embedded vr-mode-ui="enabled: false"
+    embedded
+    vr-mode-ui="enabled: false"
     renderer="colorManagement: true; physicallyCorrectLights: true;"
-    arjs="sourceType: webcam;" aframe-arkit aframe-arkit-device
+    arjs="sourceType: webcam;"
+    aframe-arkit aframe-arkit-device
     light="ambientIntensity: 1.5;"
   >
     <a-entity id="modelGroup" scale="0.3 0.3 0.3" drag-only zoom-control face-camera-center></a-entity>
@@ -127,31 +136,34 @@
   </a-scene>
 
   <script>
-    // ========== Configuration ==========
-    const BAR_WIDTH = 0.05, SPACING = 0.08;
+    // ==================== 參數設定 ====================
+    const BAR_WIDTH = 0.05;
+    const SPACING = 0.08;
     const FIXED_BASE_Y = 0.15;
     const MAX_HEIGHT = 0.8;
 
-    // ========== DOM Elements ==========
+    // ==================== DOM 元素 ====================
     const scene = document.querySelector('#modelGroup');
     const infoEl = document.getElementById('info');
     const controlPanel = document.getElementById('controlPanel');
     const panelHeader = document.getElementById('panelHeader');
-    const nSlider = document.getElementById('nSlider'), pSlider = document.getElementById('pSlider');
-    const nValue = document.getElementById('nValue'), pValue = document.getElementById('pValue');
+    const nSlider = document.getElementById('nSlider');
+    const pSlider = document.getElementById('pSlider');
+    const nValue = document.getElementById('nValue');
+    const pValue = document.getElementById('pValue');
     const zoomInBtn = document.getElementById('zoomInBtn');
     const zoomOutBtn = document.getElementById('zoomOutBtn');
     const modeBtn = document.getElementById('modeBtn');
     const nContainer = document.querySelectorAll('.slider-container')[0];
-    const pContainer = document.querySelectorAll('.slider-container')[1];
-    const pLabel = pContainer.querySelector('.slider-label');
+    const pLabel = document.getElementById('pLabel');
 
+    // ==================== 狀態變數 ====================
     let currentMode = 'binomial';
     let currentN = 10, currentP = 0.50, currentLambda = 5.0;
     let lastN = 10, lastP = 0.50, lastLambda = 5.0;
     let currentZoom = 1.0;
 
-    // ========== Panel Toggle ==========
+    // ==================== 控制面板展開/收合 ====================
     let clickCount = 0;
     panelHeader.addEventListener('click', () => {
       clickCount++;
@@ -164,24 +176,24 @@
       }, 300);
     });
 
-    // ========== Zoom Control ==========
+    // ==================== 縮放控制 ====================
     AFRAME.registerComponent('zoom-control', {
       init: function () {
         const el = this.el;
         zoomInBtn.addEventListener('click', () => {
           currentZoom = Math.min(currentZoom * 1.5, 3.0);
           el.setAttribute('scale', `${0.3 * currentZoom} ${0.3 * currentZoom} ${0.3 * currentZoom}`);
-          infoEl.innerHTML = `Zoom: ×${currentZoom.toFixed(1)}`;
+          infoEl.innerHTML = `縮放: ×${currentZoom.toFixed(1)}`;
         });
         zoomOutBtn.addEventListener('click', () => {
           currentZoom = Math.max(currentZoom / 1.5, 0.3);
           el.setAttribute('scale', `${0.3 * currentZoom} ${0.3 * currentZoom} ${0.3 * currentZoom}`);
-          infoEl.innerHTML = `Zoom: ×${currentZoom.toFixed(1)}`;
+          infoEl.innerHTML = `縮放: ×${currentZoom.toFixed(1)}`;
         });
       }
     });
 
-    // ========== Drag Only ==========
+    // ==================== 單指拖曳 ====================
     AFRAME.registerComponent('drag-only', {
       init: function () {
         const el = this.el;
@@ -208,35 +220,38 @@
       }
     });
 
-    // ========== Always Face Camera & Center in Front ==========
+    // ==================== 模型浮空中央（不隨低頭移動） ====================
     AFRAME.registerComponent('face-camera-center', {
       tick: function () {
         const el = this.el;
         const camera = this.el.sceneEl.camera;
         if (!camera) return;
 
-        const distance = 1.0;  // 1 meter in front
-        const height = 0.1;    // slightly above camera
+        const FIXED_HEIGHT = 0.1;   // 模型固定高度
+        const DISTANCE = 1.0;       // 距離相機 1 米
 
         const camPos = camera.position;
         const camRot = camera.rotation;
-        const forward = new THREE.Vector3(0, 0, -1);
-        forward.applyEuler(new THREE.Euler(camRot.x, camRot.y, camRot.z, 'XYZ'));
-        forward.multiplyScalar(distance);
 
+        // 僅使用水平旋轉 (yaw)，忽略俯仰 (pitch)
+        const forward = new THREE.Vector3(0, 0, -1);
+        forward.applyEuler(new THREE.Euler(0, camRot.y, 0, 'XYZ'));
+        forward.multiplyScalar(DISTANCE);
+
+        // 設定模型位置
         const targetPos = new THREE.Vector3(
           camPos.x + forward.x,
-          camPos.y + height,
+          FIXED_HEIGHT,
           camPos.z + forward.z
         );
 
         el.object3D.position.copy(targetPos);
-        el.object3D.lookAt(camPos.x, el.object3D.position.y, camPos.z);
+        el.object3D.lookAt(camPos.x, FIXED_HEIGHT, camPos.z);
       }
     });
 
-    // ========== Math Functions ==========
-    function C(n, k) {
+    // ==================== 數學函數 ====================
+    function binomialCoefficient(n, k) {
       if (k < 0 || k > n) return 0;
       let res = 1;
       for (let i = 1; i <= k; ++i) res = res * (n - i + 1) / i;
@@ -246,7 +261,7 @@
     function binomialData(n, p) {
       const data = [];
       for (let k = 0; k <= n; ++k) {
-        const pk = C(n, k) * Math.pow(p, k) * Math.pow(1 - p, n - k);
+        const pk = binomialCoefficient(n, k) * Math.pow(p, k) * Math.pow(1 - p, n - k);
         data.push({ k, pk });
       }
       return data;
@@ -269,7 +284,7 @@
       return data;
     }
 
-    // ========== Draw Chart ==========
+    // ==================== 繪製圖表 ====================
     function drawChart() {
       while (scene.firstChild) scene.removeChild(scene.firstChild);
 
@@ -290,13 +305,19 @@
         const height = Math.max(d.pk * scaleY, 0.001);
         const xPos = (d.k - mean) * SPACING;
 
+        // 柱子
         const bar = document.createElement('a-box');
         bar.setAttribute('position', `${xPos} ${FIXED_BASE_Y + height / 2} 0`);
-        bar.setAttribute('width', BAR_WIDTH); bar.setAttribute('depth', BAR_WIDTH); bar.setAttribute('height', height);
-        bar.setAttribute('color', '#4a90e2'); bar.setAttribute('class', 'clickable');
-        bar.setAttribute('data-k', d.k); bar.setAttribute('data-pk', d.pk.toFixed(6));
+        bar.setAttribute('width', BAR_WIDTH);
+        bar.setAttribute('depth', BAR_WIDTH);
+        bar.setAttribute('height', height);
+        bar.setAttribute('color', '#4a90e2');
+        bar.setAttribute('class', 'clickable');
+        bar.setAttribute('data-k', d.k);
+        bar.setAttribute('data-pk', d.pk.toFixed(6));
         scene.appendChild(bar);
 
+        // X 軸標籤
         const label = document.createElement('a-text');
         label.setAttribute('value', d.k);
         label.setAttribute('position', `${xPos} ${FIXED_BASE_Y - 0.03} 0`);
@@ -307,7 +328,7 @@
         scene.appendChild(label);
       });
 
-      // Ground plane (centered)
+      // 地面
       const groundWidth = (data.length - 1) * SPACING + BAR_WIDTH + 0.1;
       const ground = document.createElement('a-plane');
       ground.setAttribute('position', `0 ${FIXED_BASE_Y} 0`);
@@ -320,12 +341,12 @@
       scene.appendChild(ground);
     }
 
-    // ========== Update Chart ==========
+    // ==================== 更新圖表 ====================
     function updateChart() {
       drawChart();
     }
 
-    // ========== Sliders ==========
+    // ==================== 滑桿事件 ====================
     nSlider.addEventListener('input', () => {
       currentN = +nSlider.value;
       nValue.textContent = currentN;
@@ -340,43 +361,44 @@
       updateChart();
     });
 
-    // ========== Mode Switch ==========
+    // ==================== 模式切換 ====================
     modeBtn.addEventListener('click', () => {
       if (currentMode === 'binomial') {
         lastN = currentN; lastP = currentP;
         currentMode = 'poisson';
-        modeBtn.textContent = 'Switch to Binomial';
+        modeBtn.textContent = '切換至二項式分布';
         nContainer.style.display = 'none';
         pSlider.min = '0.1'; pSlider.max = '30'; pSlider.step = '0.1';
         pSlider.value = lastLambda; currentLambda = lastLambda;
-        pLabel.innerHTML = `λ (mean): <span class="slider-value" id="pValue">${lastLambda.toFixed(2)}</span>`;
+        pLabel.innerHTML = `λ (平均值): <span class="slider-value" id="pValue">${lastLambda.toFixed(2)}</span>`;
       } else {
         lastLambda = currentLambda;
         currentMode = 'binomial';
-        modeBtn.textContent = 'Switch to Poisson';
+        modeBtn.textContent = '切換至泊松分布';
         nContainer.style.display = 'block';
         pSlider.min = '0'; pSlider.max = '1'; pSlider.step = '0.01';
         pSlider.value = lastP; currentN = lastN;
         nSlider.value = currentN; nValue.textContent = currentN;
-        pLabel.innerHTML = `p (probability): <span class="slider-value" id="pValue">${lastP.toFixed(2)}</span>`;
+        pLabel.innerHTML = `p (成功機率): <span class="slider-value" id="pValue">${lastP.toFixed(2)}</span>`;
       }
       updateChart();
-      infoEl.innerHTML = `${currentMode.charAt(0).toUpperCase() + currentMode.slice(1)} Distribution`;
+      infoEl.innerHTML = `${currentMode === 'binomial' ? '二項式' : '泊松'}分布`;
     });
 
-    // ========== Click for Probability ==========
+    // ==================== 點擊顯示機率 ====================
     scene.addEventListener('click', e => {
       if (e.target.classList.contains('clickable')) {
-        const k = e.target.getAttribute('data-k'), pk = e.target.getAttribute('data-pk');
+        const k = e.target.getAttribute('data-k');
+        const pk = e.target.getAttribute('data-pk');
         alert(`P(X=${k}) = ${pk}`);
       }
     });
 
-    // ========== Initialize ==========
+    // ==================== 初始化 ====================
     window.onload = () => {
       setTimeout(() => {
         drawChart();
-        infoEl.innerHTML = 'Binomial Distribution<br>Ready! Use + / − to zoom';
+        infoEl.innerHTML = '二項式分布<br>就緒！使用 + / − 縮放';
       }, 1500);
     };
   </script>
