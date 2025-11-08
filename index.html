@@ -54,17 +54,6 @@
       -webkit-appearance: none !important; width: 24px; height: 24px; border-radius: 50%;
       background: #007aff !important; box-shadow: 0 2px 6px rgba(0,0,0,0.4); margin-top: -8px;
     }
-    /* Zoom Buttons */
-    .zoom-controls {
-      position: absolute; bottom: 100px; right: 20px; z-index: 100; display: flex; gap: 12px;
-    }
-    .zoom-btn {
-      background: #007aff; color: white; border: none; width: 44px; height: 44px;
-      border-radius: 50%; font-size: 20px; font-weight: bold;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.3); cursor: pointer;
-      display: flex; align-items: center; justify-content: center;
-    }
-    .zoom-btn:active { transform: scale(0.9); }
     /* Gesture Hint */
     .gesture-hint {
       position: absolute; bottom: 100px; left: 50%; transform: translateX(-50%);
@@ -77,13 +66,10 @@
 <body>
   <div class="info" id="info">Initializing...</div>
   <button id="modeBtn" class="mode-btn">Switch to Poisson</button>
-  <!-- Zoom Buttons -->
-  <div class="zoom-controls">
-    <button class="zoom-btn" id="zoomOutBtn">−</button>
-    <button class="zoom-btn" id="zoomInBtn">＋</button>
-  </div>
+
   <!-- Gesture Hint -->
   <div class="gesture-hint">一指拖動平移圖表</div>
+
   <!-- Control Panel -->
   <div class="control expanded" id="controlPanel">
     <div class="control-header" id="panelHeader">
@@ -109,18 +95,18 @@
     arjs="sourceType: webcam;" aframe-arkit aframe-arkit-device
     light="ambientIntensity: 1.5;"
   >
-    <!-- 模型群組：置中於視野、支援拖曳與縮放 -->
-    <a-entity id="modelGroup" scale="0.3 0.3 0.3" drag-only zoom-control center-in-view></a-entity>
+    <!-- 模型群組：固定縮放 ×3.0，只支援拖曳與置中 -->
+    <a-entity id="modelGroup" scale="0.9 0.9 0.9" drag-only center-in-view></a-entity>
     <a-camera></a-camera>
   </a-scene>
 
   <script>
     // ========== Configuration ==========
     const BAR_WIDTH = 0.05, SPACING = 0.08;
-    const CHART_BASE_Y = 0.15;        // 圖表內部基底相對高度
+    const CHART_BASE_Y = 0.15;
     const MAX_HEIGHT = 0.8;
-    const CHART_DISTANCE = 1.2;       // 距離相機 1.2 公尺
-    const CHART_HEIGHT_OFFSET = 0.3;  // 圖表中心高於相機 0.3 公尺
+    const CHART_DISTANCE = 1.2;
+    const CHART_HEIGHT_OFFSET = 0.3;
 
     // ========== DOM Elements ==========
     const scene = document.querySelector('#modelGroup');
@@ -129,8 +115,6 @@
     const panelHeader = document.getElementById('panelHeader');
     const nSlider = document.getElementById('nSlider'), pSlider = document.getElementById('pSlider');
     const nValue = document.getElementById('nValue'), pValue = document.getElementById('pValue');
-    const zoomInBtn = document.getElementById('zoomInBtn');
-    const zoomOutBtn = document.getElementById('zoomOutBtn');
     const modeBtn = document.getElementById('modeBtn');
     const nContainer = document.querySelectorAll('.slider-container')[0];
     const pContainer = document.querySelectorAll('.slider-container')[1];
@@ -138,7 +122,6 @@
     let currentMode = 'binomial';
     let currentN = 10, currentP = 0.50, currentLambda = 5.0;
     let lastN = 10, lastP = 0.50, lastLambda = 5.0;
-    let currentZoom = 1.0;
 
     // ========== Panel Toggle ==========
     let clickCount = 0;
@@ -151,23 +134,6 @@
         }
         clickCount = 0;
       }, 300);
-    });
-
-    // ========== Zoom Control ==========
-    AFRAME.registerComponent('zoom-control', {
-      init: function () {
-        const el = this.el;
-        zoomInBtn.addEventListener('click', () => {
-          currentZoom = Math.min(currentZoom * 1.5, 3.0);
-          el.setAttribute('scale', `${0.3 * currentZoom} ${0.3 * currentZoom} ${0.3 * currentZoom}`);
-          infoEl.innerHTML = `Zoom: ×${currentZoom.toFixed(1)}`;
-        });
-        zoomOutBtn.addEventListener('click', () => {
-          currentZoom = Math.max(currentZoom / 1.5, 0.3);
-          el.setAttribute('scale', `${0.3 * currentZoom} ${0.3 * currentZoom} ${0.3 * currentZoom}`);
-          infoEl.innerHTML = `Zoom: ×${currentZoom.toFixed(1)}`;
-        });
-      }
     });
 
     // ========== Drag Only ==========
@@ -197,7 +163,7 @@
       }
     });
 
-    // ========== Center in View (Auto Position) ==========
+    // ========== Center in View ==========
     AFRAME.registerComponent('center-in-view', {
       tick: function () {
         const el = this.el;
@@ -360,7 +326,7 @@
     window.onload = () => {
       setTimeout(() => {
         drawChart();
-        infoEl.innerHTML = 'Binomial Distribution<br>Ready! Chart centered in view.';
+        infoEl.innerHTML = 'Binomial Distribution<br>Ready! Fixed zoom ×3.0';
       }, 1500);
     };
   </script>
