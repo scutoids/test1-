@@ -3,14 +3,16 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>AR Binomial ↔ Poisson Distribution</title>
+  <title>AR Binomial ↔ Poisson</title>
   <!-- A-Frame & AR.js -->
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
   <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar-nft.js"></script>
   <script src="https://cdn.jsdelivr.net/gh/AR-js-org/aframe-arkit@master/dist/aframe-arkit.min.js"></script>
+
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: #000; }
+
     /* Top Info */
     .info {
       position: absolute; top: 15px; left: 160px; right: 15px;
@@ -18,19 +20,15 @@
       border-radius: 12px; font-size: 14px; text-align: center; z-index: 100;
       backdrop-filter: blur(6px);
     }
-    /* Mode Button (top-left) */
+
+    /* Mode Button */
     .mode-btn {
       position: absolute; top: 15px; left: 15px; z-index: 101;
       background: rgba(0,0,0,0.85); color: #fff; padding: 10px 14px;
-      border-radius: 12px; font-size: 14px; text-align: center;
-      backdrop-filter: blur(6px); border: none; cursor: pointer;
+      border-radius: 12px; font-size: 14px; border: none; cursor: pointer;
+      backdrop-filter: blur(6px);
     }
-    /* LiDAR Status */
-    .lidar-status {
-      position: absolute; top: 70px; left: 50%; transform: translateX(-50%);
-      background: #34c759; color: white; padding: 6px 16px; border-radius: 20px;
-      font-size: 13px; font-weight: bold; z-index: 100; display: none;
-    }
+
     /* Control Panel */
     .control {
       position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%);
@@ -49,9 +47,11 @@
     .control.collapsed .toggle-icon { transform: rotate(180deg); }
     .sliders { margin-top: 16px; opacity: 1; transition: opacity 0.3s; }
     .control.collapsed .sliders { opacity: 0; height: 0; margin: 0; overflow: hidden; pointer-events: none; }
+
     .slider-container { margin: 16px 0; }
     .slider-label { display: block; margin-bottom: 8px; font-weight: 600; font-size: 14px; color: #fff; }
     .slider-value { display: inline-block; width: 60px; color: #4a90e2; font-weight: bold; }
+
     input[type="range"] {
       -webkit-appearance: none !important; width: 100%; height: 8px; border-radius: 5px;
       background: #444 !important; outline: none; margin: 12px 0;
@@ -60,6 +60,7 @@
       -webkit-appearance: none !important; width: 24px; height: 24px; border-radius: 50%;
       background: #007aff !important; box-shadow: 0 2px 6px rgba(0,0,0,0.4); margin-top: -8px;
     }
+
     /* Zoom Buttons */
     .zoom-controls {
       position: absolute; bottom: 100px; right: 20px; z-index: 100; display: flex; gap: 12px;
@@ -71,31 +72,36 @@
       display: flex; align-items: center; justify-content: center;
     }
     .zoom-btn:active { transform: scale(0.9); }
+
     /* Gesture Hint */
     .gesture-hint {
       position: absolute; bottom: 100px; left: 50%; transform: translateX(-50%);
       background: rgba(0,0,0,0.8); color: #fff; padding: 8px 16px;
       border-radius: 20px; font-size: 13px; z-index: 100;
     }
+
     .ui-dragging * { opacity: 0.3 !important; }
   </style>
 </head>
 <body>
+
   <div class="info" id="info">Initializing...</div>
   <button id="modeBtn" class="mode-btn">Switch to Poisson</button>
-  <div class="lidar-status" id="lidarStatus">Ground Detected</div>
+
   <!-- Zoom Buttons -->
   <div class="zoom-controls">
     <button class="zoom-btn" id="zoomOutBtn">−</button>
     <button class="zoom-btn" id="zoomInBtn">＋</button>
   </div>
+
   <!-- Gesture Hint -->
-  <div class="gesture-hint">Drag with one finger to move</div>
+  <div class="gesture-hint">一指拖動平移圖表</div>
+
   <!-- Control Panel -->
   <div class="control expanded" id="controlPanel">
     <div class="control-header" id="panelHeader">
       <span>Settings</span>
-      <span class="toggle-icon">▲</span>
+      <span class="toggle-icon">Up Arrow</span>
     </div>
     <div class="sliders">
       <div class="slider-container">
@@ -108,6 +114,7 @@
       </div>
     </div>
   </div>
+
   <!-- A-Frame Scene -->
   <a-scene
     embedded vr-mode-ui="enabled: false"
@@ -115,18 +122,19 @@
     arjs="sourceType: webcam;" aframe-arkit aframe-arkit-device
     light="ambientIntensity: 1.5;"
   >
-    <a-entity id="modelGroup" position="0 0.1 -1" scale="0.3 0.3 0.3" ground-tracker drag-only zoom-control></a-entity>
+    <a-entity id="modelGroup" scale="0.3 0.3 0.3" drag-only zoom-control face-camera-center></a-entity>
     <a-camera></a-camera>
   </a-scene>
+
   <script>
     // ========== Configuration ==========
     const BAR_WIDTH = 0.05, SPACING = 0.08;
     const FIXED_BASE_Y = 0.15;
     const MAX_HEIGHT = 0.8;
+
     // ========== DOM Elements ==========
     const scene = document.querySelector('#modelGroup');
     const infoEl = document.getElementById('info');
-    const lidarEl = document.getElementById('lidarStatus');
     const controlPanel = document.getElementById('controlPanel');
     const panelHeader = document.getElementById('panelHeader');
     const nSlider = document.getElementById('nSlider'), pSlider = document.getElementById('pSlider');
@@ -137,30 +145,26 @@
     const nContainer = document.querySelectorAll('.slider-container')[0];
     const pContainer = document.querySelectorAll('.slider-container')[1];
     const pLabel = pContainer.querySelector('.slider-label');
+
     let currentMode = 'binomial';
-    let currentN = 10;
-    let currentP = 0.50;
-    let currentLambda = 5.0;
-    let lastN = 10;
-    let lastP = 0.50;
-    let lastLambda = 5.0;
+    let currentN = 10, currentP = 0.50, currentLambda = 5.0;
+    let lastN = 10, lastP = 0.50, lastLambda = 5.0;
     let currentZoom = 1.0;
+
     // ========== Panel Toggle ==========
     let clickCount = 0;
     panelHeader.addEventListener('click', () => {
       clickCount++;
-      if (clickCount === 1) {
-        setTimeout(() => {
+      setTimeout(() => {
+        if (clickCount === 1) {
           controlPanel.classList.toggle('collapsed');
           controlPanel.classList.toggle('expanded');
-          clickCount = 0;
-        }, 300);
-      } else if (clickCount === 2) {
-        controlPanel.style.display = controlPanel.style.display === 'none' ? 'block' : 'none';
+        }
         clickCount = 0;
-      }
+      }, 300);
     });
-    // ========== Zoom Control Component ==========
+
+    // ========== Zoom Control ==========
     AFRAME.registerComponent('zoom-control', {
       init: function () {
         const el = this.el;
@@ -176,6 +180,7 @@
         });
       }
     });
+
     // ========== Drag Only ==========
     AFRAME.registerComponent('drag-only', {
       init: function () {
@@ -202,6 +207,34 @@
         });
       }
     });
+
+    // ========== Always Face Camera & Center in Front ==========
+    AFRAME.registerComponent('face-camera-center', {
+      tick: function () {
+        const el = this.el;
+        const camera = this.el.sceneEl.camera;
+        if (!camera) return;
+
+        const distance = 1.0;  // 1 meter in front
+        const height = 0.1;    // slightly above camera
+
+        const camPos = camera.position;
+        const camRot = camera.rotation;
+        const forward = new THREE.Vector3(0, 0, -1);
+        forward.applyEuler(new THREE.Euler(camRot.x, camRot.y, camRot.z, 'XYZ'));
+        forward.multiplyScalar(distance);
+
+        const targetPos = new THREE.Vector3(
+          camPos.x + forward.x,
+          camPos.y + height,
+          camPos.z + forward.z
+        );
+
+        el.object3D.position.copy(targetPos);
+        el.object3D.lookAt(camPos.x, el.object3D.position.y, camPos.z);
+      }
+    });
+
     // ========== Math Functions ==========
     function C(n, k) {
       if (k < 0 || k > n) return 0;
@@ -209,6 +242,7 @@
       for (let i = 1; i <= k; ++i) res = res * (n - i + 1) / i;
       return Math.round(res * 100000) / 100000;
     }
+
     function binomialData(n, p) {
       const data = [];
       for (let k = 0; k <= n; ++k) {
@@ -217,6 +251,7 @@
       }
       return data;
     }
+
     function poissonData(lambda) {
       if (lambda <= 0) return [{k: 0, pk: 1}];
       const data = [];
@@ -233,9 +268,11 @@
       }
       return data;
     }
+
     // ========== Draw Chart ==========
     function drawChart() {
       while (scene.firstChild) scene.removeChild(scene.firstChild);
+
       let data, mean;
       if (currentMode === 'binomial') {
         data = binomialData(currentN, currentP);
@@ -244,18 +281,22 @@
         data = poissonData(currentLambda);
         mean = currentLambda;
       }
+
       const maxProb = data.reduce((m, d) => Math.max(m, d.pk), 0) || 1;
       const scaleY = MAX_HEIGHT / maxProb;
+
       data.forEach(d => {
-        if (d.pk < 1e-8) return; // skip invisible bars
+        if (d.pk < 1e-8) return;
         const height = Math.max(d.pk * scaleY, 0.001);
         const xPos = (d.k - mean) * SPACING;
+
         const bar = document.createElement('a-box');
         bar.setAttribute('position', `${xPos} ${FIXED_BASE_Y + height / 2} 0`);
         bar.setAttribute('width', BAR_WIDTH); bar.setAttribute('depth', BAR_WIDTH); bar.setAttribute('height', height);
         bar.setAttribute('color', '#4a90e2'); bar.setAttribute('class', 'clickable');
         bar.setAttribute('data-k', d.k); bar.setAttribute('data-pk', d.pk.toFixed(6));
         scene.appendChild(bar);
+
         const label = document.createElement('a-text');
         label.setAttribute('value', d.k);
         label.setAttribute('position', `${xPos} ${FIXED_BASE_Y - 0.03} 0`);
@@ -265,13 +306,11 @@
         label.setAttribute('align', 'center');
         scene.appendChild(label);
       });
-      // Ground plane (auto-sized & centered)
-      const xPositions = data.map(d => (d.k - mean) * SPACING);
-      const minX = Math.min(...xPositions) - SPACING;
-      const maxX = Math.max(...xPositions) + SPACING;
-      const groundWidth = maxX - minX;
+
+      // Ground plane (centered)
+      const groundWidth = (data.length - 1) * SPACING + BAR_WIDTH + 0.1;
       const ground = document.createElement('a-plane');
-      ground.setAttribute('position', `${(minX + maxX) / 2} ${FIXED_BASE_Y} 0`);
+      ground.setAttribute('position', `0 ${FIXED_BASE_Y} 0`);
       ground.setAttribute('rotation', '-90 0 0');
       ground.setAttribute('width', groundWidth);
       ground.setAttribute('depth', 1.2);
@@ -280,59 +319,51 @@
       ground.setAttribute('transparent', 'true');
       scene.appendChild(ground);
     }
+
+    // ========== Update Chart ==========
     function updateChart() {
       drawChart();
     }
+
     // ========== Sliders ==========
     nSlider.addEventListener('input', () => {
       currentN = +nSlider.value;
       nValue.textContent = currentN;
       updateChart();
     });
+
     pSlider.addEventListener('input', () => {
       const val = parseFloat(pSlider.value);
-      if (currentMode === 'binomial') {
-        currentP = val;
-      } else {
-        currentLambda = val;
-      }
+      if (currentMode === 'binomial') currentP = val;
+      else currentLambda = val;
       pValue.textContent = val.toFixed(2);
       updateChart();
     });
-    // ========== Mode Switch (top-left button) ==========
+
+    // ========== Mode Switch ==========
     modeBtn.addEventListener('click', () => {
       if (currentMode === 'binomial') {
-        // Save binomial → switch to Poisson
-        lastN = currentN;
-        lastP = currentP;
+        lastN = currentN; lastP = currentP;
         currentMode = 'poisson';
         modeBtn.textContent = 'Switch to Binomial';
         nContainer.style.display = 'none';
-        pSlider.min = '0.1';
-        pSlider.max = '30';
-        pSlider.step = '0.1';
-        pSlider.value = lastLambda;
+        pSlider.min = '0.1'; pSlider.max = '30'; pSlider.step = '0.1';
+        pSlider.value = lastLambda; currentLambda = lastLambda;
         pLabel.innerHTML = `λ (mean): <span class="slider-value" id="pValue">${lastLambda.toFixed(2)}</span>`;
-        currentLambda = lastLambda;
       } else {
-        // Save Poisson → switch to Binomial
         lastLambda = currentLambda;
         currentMode = 'binomial';
         modeBtn.textContent = 'Switch to Poisson';
         nContainer.style.display = 'block';
-        pSlider.min = '0';
-        pSlider.max = '1';
-        pSlider.step = '0.01';
-        pSlider.value = lastP;
+        pSlider.min = '0'; pSlider.max = '1'; pSlider.step = '0.01';
+        pSlider.value = lastP; currentN = lastN;
+        nSlider.value = currentN; nValue.textContent = currentN;
         pLabel.innerHTML = `p (probability): <span class="slider-value" id="pValue">${lastP.toFixed(2)}</span>`;
-        currentN = lastN;
-        nSlider.value = currentN;
-        nValue.textContent = currentN;
       }
-      pValue = document.getElementById('pValue');
       updateChart();
       infoEl.innerHTML = `${currentMode.charAt(0).toUpperCase() + currentMode.slice(1)} Distribution`;
     });
+
     // ========== Click for Probability ==========
     scene.addEventListener('click', e => {
       if (e.target.classList.contains('clickable')) {
@@ -340,19 +371,7 @@
         alert(`P(X=${k}) = ${pk}`);
       }
     });
-    // ========== Ground Detection ==========
-    AFRAME.registerComponent('ground-tracker', {
-      tick: function () {
-        const camera = this.el.sceneEl.camera;
-        if (!camera) return;
-        const ray = new THREE.Raycaster(camera.getWorldPosition(new THREE.Vector3()), new THREE.Vector3(0, -1, 0));
-        const hits = ray.intersectObjects(this.el.sceneEl.object3D.children, true);
-        if (hits[0]) {
-          this.el.object3D.position.y = hits[0].point.y + 0.08;
-          lidarEl.style.display = 'block';
-        }
-      }
-    });
+
     // ========== Initialize ==========
     window.onload = () => {
       setTimeout(() => {
